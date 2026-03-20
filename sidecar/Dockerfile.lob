@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+
+WORKDIR /app/sidecar
+
+RUN pip install --no-cache-dir websockets pyarrow numpy
+
+# Copy both scripts — lob_features is imported by lob_collector
+COPY sidecar/lob_collector.py .
+COPY sidecar/lob_features.py .
+
+CMD ["python", "lob_collector.py"]

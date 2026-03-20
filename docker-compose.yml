@@ -49,6 +49,17 @@ services:
       --userdir /freqtrade/user_data
       -v
 
+  lob_collector:
+    build:
+      context: .
+      dockerfile: sidecar/Dockerfile.lob
+    container_name: lob_collector
+    restart: unless-stopped
+    profiles: ["lobcollect"]
+    volumes:
+      - ./sidecar/data:/app/sidecar/data
+      - ./sidecar/logs:/app/sidecar/logs
+
 networks:
   default:
     driver: bridge
