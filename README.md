@@ -2,6 +2,10 @@
 
 Greenfield **Freqtrade + FreqAI** strategy development. Same workflow as `freqtrade-scalper`: local Docker build from your `Freqtrade` fork/source tree, backtests, refinements, then push to GitHub.
 
+**License:** this repo’s original content is under the [LICENSE](./LICENSE) (MIT). The **[Freqtrade](https://www.freqtrade.io/)** software you build against has its [own license](https://github.com/freqtrade/freqtrade); this repo does not distribute Freqtrade source.
+
+**Disclaimer:** educational and experimental software only. Not financial advice. Trading carries risk of loss. You are responsible for compliance with laws and exchange rules in your jurisdiction.
+
 ## Prerequisites
 
 1. **Freqtrade source** next to this repo (matches `docker-compose.yml` build context):
@@ -54,14 +58,18 @@ Greenfield **Freqtrade + FreqAI** strategy development. Same workflow as `freqtr
 
 ## GitHub
 
-Create a new empty repository on GitHub, then:
+1. On GitHub: **New repository** → name e.g. `freqtrade-strategy-lab` → **no** README / `.gitignore` / license (this repo already has them) → Create.
+2. From this folder (adjust user/repo if different):
 
 ```powershell
-cd freqtrade-strategy-lab
-git remote add origin https://github.com/YOUR_USER/YOUR_REPO.git
-git branch -M main
+cd C:\Users\jtscw\OneDrive\Documents\freqtrade-strategy-lab
+git remote add origin https://github.com/YOUR_USER/freqtrade-strategy-lab.git
 git push -u origin main
 ```
+
+If `origin` already exists, use `git remote set-url origin https://github.com/YOUR_USER/freqtrade-strategy-lab.git` then push.
+
+Optional **repository settings**: enable **Private** if you want strategies and notes non-public; add a short **Description** and topics (`freqtrade`, `freqai`, `trading`, `docker`) on the repo home page.
 
 ## Decisions you may want to adjust
 

@@ -41,6 +41,9 @@ venv/
 !.cursor/rules/
 !.cursor/rules/**
 
+# Claude Code — local overrides (may contain paths or preferences)
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db
