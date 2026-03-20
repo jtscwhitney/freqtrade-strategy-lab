@@ -1,5 +1,5 @@
 # LOB Microstructure Strategy — Deep Dive
-## Version 1 | Started: 2026-03-20 | Status: ACTIVE — Phase 0 (Data Collection)
+## Version 1 | Started: 2026-03-20 | Status: ARCHIVED — Phase 1 complete, NO GO (fee structure)
 
 ---
 
@@ -9,21 +9,19 @@
 > Also read `user_data/info/AlgoTrading_Research_Log.md` for project-wide context, roles, and objectives.
 
 ### Current Status
-- **Phase:** 0 — LOB Data Collection (ACTIVE — run historical download to populate training data)
-- **Last completed:** All Phase 0 code built and committed. `lob_features.py`, `lob_collector.py`, `lob_historical.py`, `Dockerfile.lob`, docker-compose service `lobcollect` all in place.
-- **Next immediate step:** Run the historical downloader to collect 30+ days of training data, then proceed to Phase 1.
-- **Open decisions:** None blocking.
+- **Phase:** ARCHIVED — project closed after Phase 1 threshold sweep (2026-03-20)
+- **Reason:** Retail taker fee (10 bps round-trip) is structurally incompatible with BTC/ETH 3s move magnitudes (~1.7 bps std). No threshold at any horizon produced positive net P&L. Signal is real and paper-replicable but not monetizable at retail fee tiers.
+- **Next step:** None. Return to `AlgoTrading_Research_Log.md` Section 4.3 for next candidate.
 
-### Run Historical Download (do this now)
+### Final Results Summary
 ```
-# Default: last 30 days, BTC + ETH (~8 GB download, outputs to sidecar/data/lob_raw/)
-python sidecar/lob_historical.py
-
-# Longer history for better regime diversity (recommended: 90 days)
-python sidecar/lob_historical.py --start 2024-12-01 --end 2025-03-19
-
-# Check output
-ls sidecar/data/lob_raw/BTCUSDT/
+3s dir_acc:       0.542   (real signal, consistent across 3 runs)
+3s IC:            0.135   (Spearman)
+Max viable horizon: 15s   (dir_acc > 51%)
+Threshold sweep:  NO profitable threshold at any horizon (top-50% to top-0.5%)
+Best case:        top-0.5% at 3s — mean |move| 5.74 bps, net P&L -8.97 bps/trade
+Fee break-even:   requires ~63 bps mean move at 3s — structurally impossible
+Archive reason:   fee structure, not signal quality
 ```
 
 ### Key Commands
@@ -266,9 +264,10 @@ ofi_net (order flow imbalance), cum_ofi, buy_vwap_dev, sell_vwap_dev
 
 **Note on bookTicker data quality:** Files from January 2024 onward contain rows interleaved out of chronological order (known Binance bug, unresolved). The historical script handles this by sorting on `(event_time, update_id)` after load.
 
-**Results:**
+**Results:** ✅ COMPLETE (2026-03-20)
 - Code complete: `lob_features.py`, `lob_collector.py`, `lob_historical.py`, `Dockerfile.lob`, docker-compose service
-- Historical download not yet run — **do this before proceeding to Phase 1**
+- Historical download complete: 5 symbols (BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT), 2024-12-01 to 2025-03-19 (109 days), 545 parquet files, ~86,400 rows/file
+- **Key discovery:** Binance `bookTicker` is NOT available on `data.binance.vision` for USD-M Futures. Pivoted to aggTrades-only: mid price = per-second trade VWAP; L1 features (spread_rel, bid/ask qty, vol_imbalance) set to NaN in historical data (valid in live collector). Schema is identical — no impact on training (L1 columns excluded from feature set).
 
 ---
 
@@ -315,8 +314,68 @@ class GMAdlObjective:
 
 **If signal dies at all timeframes > 1s:** Archive as "edge too fast for our stack." Do not attempt Path B (direct order placement) without explicit discussion — it is a fundamentally different system requiring order management, risk controls, and latency optimization outside Freqtrade's scope.
 
-**Results (to be filled in):**
-> *[Awaiting Phase 1 completion]*
+**Results:** ✅ CONDITIONAL GO (2026-03-20)
+
+**Training run:** CatBoost with GMADL (directional MSE, alpha=2.0), 1M subsampled training rows from 13.2M, 109 days BTC+ETH.
+
+**Signal survival (out-of-sample test set, ~2.8M rows):**
+
+| Horizon | Dir Acc | Dir Acc top-20% | IC (Spearman) | Net P&L bps (top-20%) |
+|---|---|---|---|---|
+| 3s | 0.542 | 0.593 | 0.135 | -9.53 |
+| 5s | 0.534 | 0.574 | 0.104 | -9.53 |
+| 15s | 0.518 | 0.539 | 0.053 | -9.54 |
+| **60s** | **0.509** | **0.520** | **0.024** | **-9.59** |
+| 300s | 0.503 | 0.506 | 0.007 | -9.82 |
+
+**Feature importances (top features by CatBoost impurity):**
+1. sell_vwap_dev_5s: 33.6%
+2. buy_vwap_dev_5s: 26.5%
+3. ofi_5s: 24.4%
+4. sell_vwap_dev_120s: 10.2%
+5. ofi_30s: 3.8%
+(30s VWAP, 120s OFI, symbol: near-zero)
+
+**Go/No-Go criteria:**
+| Criterion | Result | Pass? |
+|---|---|---|
+| 3s dir_acc > 0.52 | 0.542 | ✅ |
+| OFI in top 3 | rank #3 | ✅ |
+| Signal survives ≥1 horizon | 3s, 5s, 15s | ✅ |
+
+**VERDICT: CONDITIONAL GO**
+
+**Execution path determination:**
+- Signal dir_acc drops below 51% threshold at 60s (0.509 < 0.51)
+- Maximum viable horizon: **15 seconds**
+- **PATH B: sub-minute execution required** — standard Freqtrade 1m candle integration is NOT viable for this signal
+- PATH A (Freqtrade 1m with high threshold) is a fallback option but requires threshold calibration to filter for the rare large moves — the unconditional signal at 60s is too weak
+
+**Fee economics note:**
+- BTC 3s move std = 1.68 bps. Binance taker fee round-trip = 10 bps. Net P&L is always negative.
+- This is expected in Phase 1. The fee problem does not invalidate the signal — it constrains the execution path.
+- PATH B (direct API execution at ≤15s) can calibrate a threshold at which selected signal moves exceed the fee. Phase 2 must measure this threshold on the held-out test set.
+
+**Threshold sweep (definitive archive trigger):**
+
+Sweep of |prediction| threshold from top-50% to top-0.5% at all horizons. No profitable operating point at any combination.
+
+| Horizon | Threshold | N trades | Dir Acc | Mean \|move\| bps | Net P&L bps/trade |
+|---|---|---|---|---|---|
+| 3s | top-10% | 282,471 | 0.608 | 2.45 | -9.43 |
+| 3s | top-1% | 29,745 | 0.586 | 4.94 | -9.02 |
+| 3s | top-0.5% | 14,124 | 0.577 | 5.74 | **-8.97** (best case) |
+| 15s | top-0.5% | 14,124 | 0.535 | 12.69 | -8.84 |
+| 60s | top-0.5% | 14,124 | 0.513 | 23.91 | -9.20 |
+
+Fee break-even math: `(2 * dir_acc - 1) * mean_|move| = 10 bps` → at dir_acc=0.58, requires mean_|move| = 63 bps. Normal 3s BTC moves peak at ~5–6 bps even for the most extreme 0.5% of signals.
+
+**Training convergence note:**
+- CatBoost stopped early with "degenerate solution" warning at iteration ~24 despite `l2_leaf_reg=30`. Best iteration = 21 (22 trees).
+- The signal metrics are consistent across 3 independent runs — the degenerate solution affects convergence depth but not signal validity for Phase 1.
+- For Phase 2 production model: consider much higher `l2_leaf_reg` (100+), `min_data_in_leaf` increase, or switching to native CatBoost `RMSE` objective for stability (the direction penalty is less critical once threshold-based filtering is the execution mechanism).
+
+**Model saved:** `user_data/models/lob_catboost_v01.cbm`
 
 ---
 
@@ -444,6 +503,10 @@ This gives the model temporal structure without manually engineering lags.
 | 2026-03-20 | Use `@bookTicker` stream (not `@depth5@100ms`) | bookTicker gives L1 as complete event-driven snapshots — no diff-based local order book management required. Simpler and more reliable. |
 | 2026-03-20 | Historical data via data.binance.vision — no 14-day wait | bookTicker + aggTrades freely available back to 2020. lob_historical.py downloads, resamples to 1s, computes features in same schema as live collector. |
 | 2026-03-20 | Vectorized feature computation (pandas rolling) for historical pipeline | Row-by-row Python loop over 86,400 rows/day would be slow. Vectorized rolling ops on 1-second aggregated data is fast and correct. Day-boundary accuracy handled via carry-over trade buffer. |
+| 2026-03-20 | bookTicker not available on data.binance.vision for USD-M Futures — pivot to aggTrades-only | Binance portal returns 404 for all bookTicker dates on futures. Mid price = trade VWAP; L1 features NaN in historical. Schema compatibility preserved; L1 columns excluded from training feature set. |
+| 2026-03-20 | Phase 1 execution path: PATH B (sub-minute) | Signal dir_acc drops to 50.9% at 60s — below the 51% viability threshold. Maximum predictive horizon is 15s. Freqtrade 1m integration requires threshold calibration; direct API execution at ≤15s is the cleaner path. Decision on PATH A vs B deferred to start of Phase 2. |
+| 2026-03-20 | net_pnl demoted from Phase 1 gate to informational warning | 10bps taker fee >> 1.68bps BTC 3s move std. Negative P&L at all horizons is structural at Phase 1 signal strength — not a verdict criterion. Phase 2 threshold calibration is the mechanism to address fee economics. |
+| 2026-03-20 | GMADL implemented as directional MSE (not pure MAE) | Pure MAE sign-gradient causes CatBoost collapse (constant magnitude = all samples equally important = no curvature signal). MSE-style residuals with direction penalty preserve the paper's key property while remaining convergent. |
 
 ---
 
@@ -483,4 +546,4 @@ Questions to be answered by evidence, not assumptions.
 ---
 
 *Document maintained by: Claude Sonnet 4.6 + project co-developer*
-*Last updated: 2026-03-20 — Phase 0 code complete. lob_features.py, lob_collector.py, lob_historical.py built and committed. Historical download path discovered (data.binance.vision) — eliminates 14-day live collection wait. Ready to run historical download and proceed to Phase 1.*
+*Last updated: 2026-03-20 — ARCHIVED. Phase 1 complete: signal real, IC=0.135, dir_acc=54.2%, max horizon 15s. Threshold sweep confirmed no profitable operating point at any threshold/horizon under 10 bps retail taker fees. Project closed. See AlgoTrading_Research_Log.md Section 4.1 for full archive record.*

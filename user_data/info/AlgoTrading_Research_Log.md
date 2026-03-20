@@ -30,7 +30,7 @@
 - `user_data/info/RAME_Project_Summary.md` — RAME summary (ARCHIVED)
 - `user_data/info/LiquidationCascade_Deep_Dive.md` — LiqCascade project (ACTIVE)
 - `user_data/info/LOB_Microstructure_Dev_Plan.md` — Candidate A development plan (superseded)
-- `user_data/info/LOB_Microstructure_Deep_Dive.md` — Candidate A deep dive (ACTIVE)
+- `user_data/info/LOB_Microstructure_Deep_Dive.md` — Candidate A deep dive (ARCHIVED)
 
 ---
 
@@ -109,6 +109,31 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 ---
 
+#### LOB Microstructure — CatBoost on Order Flow Features
+- **Status:** ARCHIVED (2026-03-20) — signal real, fee structure incompatible at retail rates
+- **Duration:** 1 day (Phase 1 validation + threshold sweep; Phase 2 never built)
+- **Source:** arXiv 2602.00776 (Bieganowski & Ślepaczuk, Jan 2026)
+- **Core idea:** Engineer order flow imbalance (OFI) and VWAP deviation features from Binance aggTrades at 1-second frequency. Train CatBoost with a direction-penalized loss (GMADL) to predict 3-second forward mid-price returns. Paper showed profitable taker-execution backtest across 5 assets.
+- **What worked:**
+  - Signal is real and paper-replicable. Consistent across 3 independent training runs.
+  - 3s directional accuracy: 54.2% unconditional, 59.3% top-20% filtered
+  - Spearman IC: 0.135 at 3s, decaying to 0.024 at 60s (real but short-lived)
+  - Feature importance matched paper: VWAP deviation features #1/#2, OFI #3
+  - Signal viable to 15s horizon (dir_acc > 51%); dies between 15s and 60s
+  - 109 days of BTC+ETH historical data downloaded and processed (data.binance.vision)
+- **Why it failed — fee structure, not signal quality:**
+  - BTC 3s move std = 1.68 bps. Binance retail taker fee = 10 bps round-trip. Gap is structural: 6× below fee floor.
+  - Threshold sweep across top-50% to top-0.5% signal strength at all horizons (3s, 5s, 15s, 60s, 300s): **zero profitable operating points at any threshold**.
+  - Best case (top-0.5% signals, 3s horizon): mean |move| = 5.74 bps, net P&L = −8.97 bps/trade.
+  - Fee break-even requires ~63 bps mean move at 3s under normal conditions — structurally impossible.
+  - Paper's profitability was almost certainly produced under institutional fee tiers (VIP: 0.02–0.04%/side) or maker execution (which the paper itself flagged as catastrophically failing during flash crashes).
+- **Secondary constraint:** bookTicker historical data is not available on data.binance.vision for USD-M Futures. L1 book features (spread, bid/ask qty, vol_imbalance) were NaN throughout training — model used 9 aggTrade-derived features only, not the full feature set from the paper. Whether L1 features would have changed the fee economics is unknown, but the structural 6× gap makes it unlikely.
+- **Key lessons:** See Section 8, items 7 and 8.
+- **Potential future salvage:** The LOB OFI signal could serve as a timing confirmation filter for LiqCascade entries (no standalone execution required; no fee problem). Not prioritized — pursue only if LiqCascade Phase 3 data shows a high false-positive entry rate.
+- **Deep dive:** `LOB_Microstructure_Deep_Dive.md` (ARCHIVED)
+
+---
+
 ### 4.2 ACTIVE
 
 #### Liquidation Cascade Strategy (v1.0)
@@ -132,43 +157,6 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 ### 4.3 CANDIDATES
 
 *Approaches identified as potentially promising but not yet evaluated or attempted. Items here should be run through the Evaluation Filter (Section 6) before committing development time.*
-
-#### ACTIVE: Crypto Order Book Microstructure (CatBoost on LOB Features)
-- **Source:** arXiv 2602.00776 (Bieganowski & Ślepaczuk, Jan 2026)
-- **Core idea:** Engineer features from limit order book data (order flow imbalance, spread dynamics, adverse selection signals) and train a CatBoost model with a direction-aware loss function (GMADL) to predict short-horizon returns (3-second forward mid-price). The paper shows stable, portable feature importance across BTC, LTC, ETC, ENJ, and ROSE on Binance Futures perpetual contracts. Validated via both taker and maker backtests, including stress-testing during the Oct 10, 2025 flash crash.
-- **Why it's interesting for us:** Uses Binance Futures data (our exchange). CatBoost runs on CPU (no GPU needed). Features are scale-invariant (ratios and relative measures), so they work cross-asset without re-engineering — directly supports multi-pair deployment and our trade frequency objective. Walk-forward cross-validation with temporal purging (proper out-of-sample methodology). Source code referenced on GitHub. The GMADL loss function is novel and direction-aware — it rewards correct sign prediction weighted by move magnitude, which aligns with trading P&L better than MSE.
-- **Key technical details from paper:**
-  - Data: 1-second frequency LOB snapshots + trade data, Jan 2022 – Oct 2025
-  - Features: Top-of-book metrics (mid, spread, L1 volumes), order flow imbalance, VWAP-to-mid deviations (buy/sell separately). Deep book levels deliberately excluded
-  - Model: CatBoost with GMADL objective. Walk-forward CV with purge gap
-  - Target: 3-second forward log return of mid price
-  - Backtest: Conservative taker execution (marks inventory on unfavorable side of book) + fixed-depth maker backtest
-  - Flash crash analysis: Taker strategy survived; maker strategy suffered massive adverse selection losses — validating that the taker approach is the safer deployment mode
-
-- **EVALUATION FILTER (scored 2026-03-20):**
-
-| # | Criterion | Assessment | Pass/Fail |
-|---|---|---|---|
-| 1 | **Data availability** | Binance Futures provides free WebSocket streams for both order book depth (`@depth` at 100ms/1s intervals) and trade data (`@aggTrade`). The `python-binance` library has built-in `DepthCacheManager` for maintaining a local order book. Dedicated libraries like `unicorn-binance-local-depth-cache` exist. Data is free but requires a sidecar process to capture and store it — same architecture pattern as our LiqCascade liquidation monitor. **No historical LOB data available for free** — backtesting requires either collecting our own data going forward or finding a source. | **PASS** (with caveat: forward-test only unless we find historical LOB data) |
-| 2 | **Compute fit** | CatBoost inference is CPU-only and very fast. Training on tabular data is also CPU-feasible. The paper trains on ~3.8 years of 1-second data — that's ~120M rows per asset. Training on our VPS may be slow but doable; alternatively train locally and deploy the model to VPS. | **PASS** |
-| 3 | **Freqtrade compatibility** | This is the tightest constraint. The paper operates at 1-second frequency with 3-second prediction horizon. Freqtrade's minimum candle is 1m. Two paths: (a) run inference in the sidecar process (outside Freqtrade) and pass signals to the strategy, similar to LiqCascade architecture; or (b) aggregate features to 1m–5m and accept reduced signal quality. Path (a) is architecturally proven in our stack. Path (b) is unvalidated — the paper's edge may not survive aggregation to longer timeframes. | **CONDITIONAL PASS** — requires sidecar execution model, not native Freqtrade candle logic |
-| 4 | **Out-of-sample evidence** | Yes. Walk-forward cross-validation with temporal purging. Taker and maker backtests. Flash crash stress test. This is well above the bar. | **PASS** |
-| 5 | **Clear mechanism** | Yes. Order flow imbalance predicts short-term price impact (Kyle, 1985). Spread widening signals deteriorated liquidity. VWAP-to-mid deviations capture adverse selection pressure. All grounded in established microstructure theory. The SHAP analysis confirms the model learned these theoretical relationships, not noise. | **PASS** |
-| 6 | **Complementarity** | HIGH. LiqCascade fires on discrete cascade events (rare, high-conviction). This would fire continuously on LOB state (frequent, lower-conviction per trade but high volume). Different alpha source, different frequency profile. Could run concurrently. | **PASS** |
-| 7 | **Implementation scope** | 1 week is ambitious but potentially feasible for an MVP: sidecar to capture LOB data (~1 day, similar pattern to liquidation monitor), feature engineering (~1 day), CatBoost training pipeline (~1 day), integration with Freqtrade via signal file (~1 day), basic backtest on collected data (~1 day). However, we'd need to collect forward data before we can train — so there's a mandatory "data collection" phase of at least 1–2 weeks before we can even start evaluating. Total realistic timeline: 2–3 weeks to first dry-run results. | **CONDITIONAL PASS** — MVP buildable in ~1 week, but data collection adds 1–2 weeks before evaluation is possible |
-
-- **Filter score: 5/7 PASS, 2/7 CONDITIONAL PASS → Overall: PASS with conditions**
-
-- **Co-investigator assessment (Claude):**
-  This is the strongest candidate from Sweep #1. The science is rigorous — proper walk-forward validation, stress-tested during a real flash crash, SHAP-explained features grounded in microstructure theory. It's not a black box predicting magic numbers; it's capturing well-understood market dynamics (order flow imbalance, adverse selection) with a modern ML model.
-
-  The main risks I see:
-  1. **Timeframe adaptation.** The paper's edge is at 1-second/3-second horizon. We can't run Freqtrade at 1-second candles. The sidecar approach (run inference outside Freqtrade, pass signals in) is architecturally sound — we've already proven it with LiqCascade. But we're making an untested bet that the signal survives aggregation or that we can execute fast enough from the sidecar.
-  2. **No historical LOB data for backtesting.** This is a forward-test-only approach until we collect enough data. That's acceptable per our objectives (we accepted this for LiqCascade), but it means 2–3 weeks before we know if it works.
-  3. **Potential overlap with LiqCascade.** Both are microstructure-based. During a liquidation cascade, the LOB features would likely also fire strongly. This could mean they're correlated rather than diversified. We'd need to monitor this in live data.
-  4. **Execution speed.** Even with a sidecar, our VPS execution speed may eat the edge if it depends on sub-second reaction times. The paper's taker backtest is "conservative" but still assumes top-of-book execution.
-
-  **My recommendation:** Build the LOB data collection sidecar first (low effort, same pattern as LiqCascade). Start accumulating data immediately. While data collects, study the paper's feature engineering in detail and prototype the CatBoost pipeline locally. This front-loads the work so we're ready to train as soon as we have enough data. Target: first model trained and forward-testing within 3 weeks.
 
 #### CANDIDATE B: Funding Rate Arbitrage (Cross-Exchange or Spot-Perp)
 - **Source:** Multiple — ScienceDirect (2025), practitioner guides, open-source implementations on GitHub
@@ -290,12 +278,17 @@ Hard-won insights that apply across all approaches. Add to this as projects conc
 
 6. **Test the pipeline, not just the model.** Data acquisition, signal latency, execution slippage, and fee structure can each independently kill a strategy that looks great in a Jupyter notebook. *(Source: general)*
 
+7. **Validate fee economics before building execution infrastructure.** Run a threshold sweep on the held-out test set before committing to any non-trivial execution path. A signal with IC=0.135 and dir_acc=54% is real — but BTC 3s moves average 1.7 bps against a 10 bps round-trip taker fee. No threshold filter can bridge a 6× gap between mean move magnitude and fee floor. The sweep takes 30 minutes; building sub-minute execution infrastructure takes weeks. Do the sweep first. *(Source: LOB Microstructure)*
+
+8. **Institutional paper results do not transfer to retail fee tiers.** A paper demonstrating taker-execution profitability may implicitly assume VIP fee tiers (0.02–0.04% per side) rather than standard retail (0.05% per side = 10 bps round-trip). Always compute expected P&L at your actual fee tier before accepting a paper's profitability claim. This is especially critical for high-frequency microstructure strategies where the fee-to-move-magnitude ratio is the dominant P&L driver. *(Source: LOB Microstructure)*
+
 ---
 
 ## 9. Version History
 
 | Date | Change |
 |---|---|
+| 2026-03-20 | v1.5 — Candidate A (LOB Microstructure) archived. Moved from Candidates to Archived (Section 4.1). Two new lessons added (Section 8, items 7–8). Related files list updated. |
 | 2026-03-20 | v1.4 — Candidate A promoted to ACTIVE. LOB_Microstructure_Deep_Dive.md created. Dev plan superseded by Deep Dive. |
 | 2026-03-20 | v1.3 — Candidate A fully evaluated (PASS with conditions). LOB_Microstructure_Dev_Plan.md created. Preamble rewritten to be fully self-contained across sessions. Related files list added. |
 | 2026-03-20 | v1.2 — First sourcing sweep completed. 4 candidates added (A–D). Sweep #1 logged. |

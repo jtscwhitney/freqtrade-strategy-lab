@@ -31,6 +31,9 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
+# ML training run output (CatBoost, etc.)
+catboost_info/
+
 # Cursor — keep rules, ignore local noise
 .cursorignore
 .cursorindexingignore

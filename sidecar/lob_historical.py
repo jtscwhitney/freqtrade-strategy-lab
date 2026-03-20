@@ -2,13 +2,18 @@
 """
 LOB Historical Data Downloader + Feature Preprocessor
 ======================================================
-Downloads historical bookTicker + aggTrades data from Binance's public data
-portal (data.binance.vision), resamples to 1-second LOB snapshots, computes
-microstructure features using lob_features.py, and writes Parquet files in
-the same schema as lob_collector.py.
+Downloads historical aggTrades data from Binance's public data portal
+(data.binance.vision), resamples to 1-second snapshots, computes order-flow
+microstructure features, and writes Parquet files compatible with the live
+lob_collector.py schema.
 
-This replaces the 14-day live collection wait — months of training data
-available immediately.
+NOTE ON L1 BOOK FEATURES:
+bookTicker historical data is not available on data.binance.vision for USD-M
+futures. The L1 columns (spread_rel, bid_qty_l1, ask_qty_l1, vol_imbalance_l1)
+are written as NaN in historical files. Mid-price is computed as the
+per-second trade VWAP (all_usd / all_qty), which is an excellent proxy for
+liquid futures. Phase 1 training code should drop the 4 NaN columns before
+fitting.
 
 Usage:
     python sidecar/lob_historical.py
@@ -17,7 +22,6 @@ Usage:
 
 Output:
     sidecar/data/lob_raw/{SYMBOL}/{YYYY-MM-DD}/lob_{SYMBOL}_{date}_{time}.parquet
-    (identical schema to lob_collector.py — fully interchangeable for training)
 
 Download cache:
     sidecar/data/download_cache/  (raw ZIP files — safe to delete after processing)
@@ -33,7 +37,7 @@ import io
 import logging
 import sys
 import zipfile
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -145,70 +149,14 @@ def _open_zip_csv(zip_path: Path, dtypes: dict | None = None) -> pd.DataFrame | 
 
 # ── Data loaders ──────────────────────────────────────────────────────────────
 
-def load_book_ticker(symbol: str, day: date) -> pd.DataFrame | None:
-    """
-    Download (or load from cache) and parse the daily bookTicker CSV.
-    Returns a DataFrame with columns: ts_s, mid, spread_rel,
-    bid_qty_l1, ask_qty_l1, vol_imbalance_l1 — resampled to 1-second.
-    """
-    date_str = day.strftime("%Y-%m-%d")
-    filename = f"{symbol}-bookTicker-{date_str}.zip"
-    url      = f"{_PORTAL}/bookTicker/{symbol}/{filename}"
-    cache    = CACHE_DIR / "bookTicker" / symbol / filename
-    zip_path = _download_zip(url, cache)
-    if zip_path is None:
-        return None
-
-    df = _open_zip_csv(zip_path, dtypes={
-        "update_id":        "int64",
-        "best_bid_price":   "float64",
-        "best_bid_qty":     "float64",
-        "best_ask_price":   "float64",
-        "best_ask_qty":     "float64",
-        "transaction_time": "int64",
-        "event_time":       "int64",
-    })
-    if df is None or df.empty:
-        return None
-
-    # Sort to handle the known out-of-order issue in 2024+ files
-    df = df.sort_values(["event_time", "update_id"], ignore_index=True)
-
-    # Drop crossed-book rows (data errors)
-    valid = (df["best_bid_price"] > 0) & (df["best_ask_price"] > df["best_bid_price"])
-    df = df[valid]
-    if df.empty:
-        return None
-
-    # Derive features from top-of-book
-    df["mid"]            = (df["best_bid_price"] + df["best_ask_price"]) / 2.0
-    df["spread_rel"]     = (df["best_ask_price"] - df["best_bid_price"]) / df["mid"]
-    denom                = df["best_bid_qty"] + df["best_ask_qty"]
-    df["vol_imbalance_l1"] = np.where(
-        denom > 0,
-        (df["best_bid_qty"] - df["best_ask_qty"]) / denom,
-        0.0,
-    )
-
-    # Convert ms -> integer seconds, then keep LAST update per second
-    df["ts_s"] = df["transaction_time"] // 1000
-    df = (
-        df.groupby("ts_s", sort=True)
-          .last()
-          .reset_index()
-    )
-
-    return df[["ts_s", "mid", "spread_rel",
-               "best_bid_qty", "best_ask_qty", "vol_imbalance_l1"]].rename(
-        columns={"best_bid_qty": "bid_qty_l1", "best_ask_qty": "ask_qty_l1"}
-    )
-
-
 def load_agg_trades(symbol: str, day: date) -> pd.DataFrame | None:
     """
     Download (or load from cache) and parse the daily aggTrades CSV.
-    Returns a DataFrame with columns: ts_s, buy_usd, sell_usd,
-    buy_price_x_usd, sell_price_x_usd — aggregated to 1-second.
+
+    Returns a DataFrame aggregated to 1-second with columns:
+        ts_s, buy_usd, sell_usd, buy_price_x_usd, sell_price_x_usd,
+        all_usd, all_qty
+    where all_usd/all_qty gives trade VWAP (used as mid-price proxy).
     """
     date_str = day.strftime("%Y-%m-%d")
     filename = f"{symbol}-aggTrades-{date_str}.zip"
@@ -218,27 +166,37 @@ def load_agg_trades(symbol: str, day: date) -> pd.DataFrame | None:
     if zip_path is None:
         return None
 
-    df = _open_zip_csv(zip_path, dtypes={
-        "agg_trade_id":    "int64",
-        "price":           "float64",
-        "qty":             "float64",
-        "first_trade_id":  "int64",
-        "last_trade_id":   "int64",
-        "transact_time":   "int64",
-        "is_buyer_maker":  "bool",
-    })
+    df = _open_zip_csv(zip_path)
     if df is None or df.empty:
         return None
 
-    # Binance: is_buyer_maker=True ->buyer is maker ->taker is SELLER
-    #          is_buyer_maker=False ->buyer is taker ->BUY aggression
+    # Normalise column names — Binance has used both 'qty' and 'quantity'
+    df.columns = [c.strip().lower().replace("quantity", "qty") for c in df.columns]
+    logger.debug("aggTrades columns: %s", df.columns.tolist())
+
+    required = {"price", "qty", "transact_time", "is_buyer_maker"}
+    missing  = required - set(df.columns)
+    if missing:
+        logger.error("%s %s: aggTrades missing columns %s (got %s)",
+                     symbol, date_str, missing, df.columns.tolist())
+        return None
+
+    df["price"]          = pd.to_numeric(df["price"],          errors="coerce")
+    df["qty"]            = pd.to_numeric(df["qty"],             errors="coerce")
+    df["transact_time"]  = pd.to_numeric(df["transact_time"],  errors="coerce")
+    df = df.dropna(subset=["price", "qty", "transact_time"])
+
+    # Binance: is_buyer_maker=True -> buyer is maker -> taker is SELLER
+    #          is_buyer_maker=False -> buyer is taker -> BUY aggression
+    is_buy_maker = df["is_buyer_maker"].astype(str).str.lower().isin(("true", "1"))
+    is_buy       = ~is_buy_maker
+
     df["usd"]              = df["price"] * df["qty"]
-    is_buy                 = ~df["is_buyer_maker"]
-    df["buy_usd"]          = np.where(is_buy, df["usd"], 0.0)
+    df["buy_usd"]          = np.where(is_buy,  df["usd"], 0.0)
     df["sell_usd"]         = np.where(~is_buy, df["usd"], 0.0)
     df["buy_price_x_usd"]  = np.where(is_buy,  df["price"] * df["usd"], 0.0)
     df["sell_price_x_usd"] = np.where(~is_buy, df["price"] * df["usd"], 0.0)
-    df["ts_s"]             = df["transact_time"] // 1000
+    df["ts_s"]             = df["transact_time"].astype("int64") // 1000
 
     trades_1s = (
         df.groupby("ts_s", sort=True)
@@ -247,60 +205,64 @@ def load_agg_trades(symbol: str, day: date) -> pd.DataFrame | None:
               sell_usd=("sell_usd", "sum"),
               buy_price_x_usd=("buy_price_x_usd", "sum"),
               sell_price_x_usd=("sell_price_x_usd", "sum"),
+              all_usd=("usd", "sum"),
+              all_qty=("qty", "sum"),
           )
           .reset_index()
     )
     return trades_1s
 
 
-# ── Feature computation (vectorized) ─────────────────────────────────────────
+# ── Feature computation (vectorized, aggTrades-only) ─────────────────────────
 
 def compute_features_vectorized(
-    book_1s:    pd.DataFrame,
-    trades_1s:  pd.DataFrame,
-    symbol:     str,
-    prev_buf:   pd.DataFrame,   # last _MAX_WINDOW_S rows of previous day's trades_1s
+    trades_1s: pd.DataFrame,
+    symbol:    str,
+    prev_buf:  pd.DataFrame,   # last _MAX_WINDOW_S rows of previous day's trades_1s
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Compute all LOB features using vectorized pandas rolling operations.
+    Compute OFI and VWAP-deviation features from aggTrades using vectorized
+    pandas rolling operations.
 
-    Prepends prev_buf (previous day's tail) to handle window boundary
-    accuracy, then drops those rows from the output.
+    Mid-price is the per-second trade VWAP (all_usd / all_qty), forward-filled
+    for seconds with no trades.  L1 book features are absent from historical
+    data and are written as NaN to keep the Parquet schema compatible with
+    live-collected files.
+
+    Prepends prev_buf (previous day's tail) for window boundary accuracy,
+    then strips the prefix from the output.
 
     Returns:
-        (features_df, next_prev_buf) where next_prev_buf is the last
-        _MAX_WINDOW_S rows of today's trades (carry-over for next day).
+        (features_df, next_prev_buf)
     """
-    # Full 1-second time index for the day (00:00:00 – 23:59:59 UTC)
-    day_start = int(book_1s["ts_s"].min())
-    day_end   = int(book_1s["ts_s"].max())
+    day_start = int(trades_1s["ts_s"].min())
+    day_end   = int(trades_1s["ts_s"].max())
     full_idx  = pd.RangeIndex(day_start, day_end + 1, name="ts_s")
 
-    # Book: reindex to fill every second, forward-fill gaps (book state persists)
-    book = (
-        book_1s.set_index("ts_s")
-               .reindex(full_idx)
-               .ffill()
-               .bfill()          # handle leading gap if first second has no update
-    )
-
-    # Trades: reindex to fill every second with zero (no trades = no flow)
-    trade_cols = ["buy_usd", "sell_usd", "buy_price_x_usd", "sell_price_x_usd"]
+    flow_cols = ["buy_usd", "sell_usd", "buy_price_x_usd", "sell_price_x_usd",
+                 "all_usd", "all_qty"]
     trades = (
-        trades_1s.set_index("ts_s")[trade_cols]
+        trades_1s.set_index("ts_s")[flow_cols]
                  .reindex(full_idx)
                  .fillna(0.0)
     )
 
+    # Mid = trade VWAP per second; forward-fill for seconds with no trades
+    raw_mid = trades["all_usd"] / trades["all_qty"].replace(0, np.nan)
+    mid_1s  = raw_mid.ffill().bfill()
+
     # Prepend previous day's tail for window warm-up
     if not prev_buf.empty:
-        trades_combined = pd.concat([prev_buf, trades])
+        trades_combined = pd.concat([prev_buf[flow_cols], trades])
+        # Carry mid for prefix rows using the first known mid of today
+        prefix_mid = pd.Series(np.nan, index=prev_buf.index)
+        mid_combined = pd.concat([prefix_mid, mid_1s]).ffill().bfill()
     else:
         trades_combined = trades
+        mid_combined    = mid_1s
 
     n_prefix = len(prev_buf)
 
-    # Compute rolling features for each window
     rows: dict[str, pd.Series] = {}
     for w in (5, 30, 120):
         buy_usd_w  = trades_combined["buy_usd"].rolling(w, min_periods=0).sum()
@@ -310,38 +272,31 @@ def compute_features_vectorized(
 
         ofi = buy_usd_w - sell_usd_w
 
-        # VWAP deviations — require current mid aligned with trades_combined index
-        # The prefix rows have their own timestamps; current-day rows align with book
-        mid_aligned = trades_combined.index.to_series().map(
-            lambda ts: book.at[ts, "mid"] if ts in book.index else np.nan
-        )
-        mid_aligned = mid_aligned.ffill().bfill()
-
         buy_vwap     = buy_px_usd / buy_usd_w.replace(0, np.nan)
-        buy_vwap_dev = ((buy_vwap - mid_aligned) / mid_aligned).fillna(0.0)
+        buy_vwap_dev = ((buy_vwap - mid_combined) / mid_combined).fillna(0.0)
 
         sell_vwap     = sel_px_usd / sell_usd_w.replace(0, np.nan)
-        sell_vwap_dev = ((sell_vwap - mid_aligned) / mid_aligned).fillna(0.0)
+        sell_vwap_dev = ((sell_vwap - mid_combined) / mid_combined).fillna(0.0)
 
-        # Slice off the prefix rows
         rows[f"ofi_{w}s"]           = ofi.iloc[n_prefix:]
         rows[f"buy_vwap_dev_{w}s"]  = buy_vwap_dev.iloc[n_prefix:]
         rows[f"sell_vwap_dev_{w}s"] = sell_vwap_dev.iloc[n_prefix:]
 
-    # Build output DataFrame aligned to the book index
-    out = book.copy()
-    out["timestamp_utc"] = out.index.to_series().astype("float64")
-    out["symbol"]        = symbol
+    out = pd.DataFrame(index=full_idx)
+    out["timestamp_utc"]   = full_idx.to_series().astype("float64").values
+    out["symbol"]          = symbol
+    out["mid"]             = mid_1s.values
+    # L1 book features unavailable from historical aggTrades — NaN for schema compat
+    out["spread_rel"]      = np.nan
+    out["bid_qty_l1"]      = np.nan
+    out["ask_qty_l1"]      = np.nan
+    out["vol_imbalance_l1"] = np.nan
     for col, series in rows.items():
-        out[col] = series.values   # both aligned to full_idx after slicing
+        out[col] = series.values
 
-    out = out[["timestamp_utc", "symbol"] + FEATURE_COLUMNS].dropna(
-        subset=["mid"]   # drop rows where book never populated
-    )
+    out = out[["timestamp_utc", "symbol"] + FEATURE_COLUMNS].dropna(subset=["mid"])
 
-    # Carry-over buffer for next day: last _MAX_WINDOW_S rows of today's trades
     next_prev = trades.tail(_MAX_WINDOW_S)
-
     return out, next_prev
 
 
@@ -365,7 +320,7 @@ def write_output(df: pd.DataFrame, symbol: str, day: date) -> None:
     }
     table = pa.table(arrays, schema=_SCHEMA)
     pq.write_table(table, out_path, compression="snappy")
-    logger.info("%s %s: wrote %d rows ->%s", symbol, date_str, len(df), out_path.name)
+    logger.info("%s %s: wrote %d rows -> %s", symbol, date_str, len(df), out_path.name)
 
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────
@@ -387,20 +342,13 @@ def process_symbol(symbol: str, start: date, end: date) -> None:
         out_path = DATA_DIR / symbol / date_str / f"lob_{symbol}_{date_str.replace('-', '')}_0000.parquet"
         if out_path.exists():
             logger.info("%s %s: output exists — skipping (delete to reprocess).", symbol, date_str)
-            # Still need to load trades for the carry-over buffer
+            # Still need trades for the carry-over buffer
             trades = load_agg_trades(symbol, day)
             if trades is not None and not trades.empty:
-                prev_buf = trades.set_index("ts_s")[
-                    ["buy_usd", "sell_usd", "buy_price_x_usd", "sell_price_x_usd"]
-                ].tail(_MAX_WINDOW_S)
+                flow_cols = ["buy_usd", "sell_usd", "buy_price_x_usd",
+                             "sell_price_x_usd", "all_usd", "all_qty"]
+                prev_buf = trades.set_index("ts_s")[flow_cols].tail(_MAX_WINDOW_S)
             days_skipped += 1
-            continue
-
-        book = load_book_ticker(symbol, day)
-        if book is None or book.empty:
-            logger.warning("%s %s: bookTicker unavailable — skipping.", symbol, date_str)
-            days_skipped += 1
-            prev_buf = pd.DataFrame()   # reset buffer — gap in data
             continue
 
         trades = load_agg_trades(symbol, day)
@@ -411,9 +359,7 @@ def process_symbol(symbol: str, start: date, end: date) -> None:
             continue
 
         try:
-            features, prev_buf = compute_features_vectorized(
-                book, trades, symbol, prev_buf
-            )
+            features, prev_buf = compute_features_vectorized(trades, symbol, prev_buf)
             write_output(features, symbol, day)
             days_written += 1
         except Exception as exc:
@@ -458,13 +404,13 @@ def main() -> None:
     days = (end - start).days + 1
     logger.info("LOB historical preprocessor starting.")
     logger.info("Symbols : %s", args.symbols)
-    logger.info("Range   : %s ->%s (%d days)", start, end, days)
+    logger.info("Range   : %s -> %s (%d days)", start, end, days)
     logger.info("Output  : %s", DATA_DIR)
     logger.info("Cache   : %s", CACHE_DIR)
 
-    # Estimate download size (rough: bookTicker ~200MB/day, aggTrades ~60MB/day compressed)
-    est_gb = days * len(args.symbols) * 0.26
-    logger.info("Estimated download: ~%.1f GB compressed (varies significantly)", est_gb)
+    # Estimate download size (aggTrades ~60 MB/day/symbol compressed)
+    est_gb = days * len(args.symbols) * 0.06
+    logger.info("Estimated download: ~%.1f GB compressed (aggTrades only)", est_gb)
 
     for symbol in args.symbols:
         process_symbol(symbol, start, end)
