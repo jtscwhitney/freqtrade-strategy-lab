@@ -1,0 +1,54 @@
+# Generic Freqtrade + FreqAI lab — build from sibling Freqtrade tree (same as freqtrade-scalper).
+#
+# Prerequisites: ../Freqtrade exists with Dockerfile.
+#
+# First run:
+#   Copy config\config-template.json to config\config-dev.json and edit secrets / bot name.
+#
+# Start bot (dry-run trade):
+#   docker compose up -d
+#
+# One-off CLI:
+#   docker compose run --rm freqtrade backtesting --config /freqtrade/config/config-dev.json --strategy StarterStrategy_V01 --freqaimodel XGBoostRegressor --timerange 20230101-20240101
+
+services:
+  freqtrade:
+    build:
+      context: ../Freqtrade
+      dockerfile: Dockerfile
+    container_name: freqtrade_strategy_lab
+    restart: unless-stopped
+
+    # --- GPU (NVIDIA) — comment out deploy.resources if CPU-only ---
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    ports:
+      - "8080:8080"
+      - "5555:5555"
+
+    volumes:
+      - ./user_data:/freqtrade/user_data
+      - ./config:/freqtrade/config
+
+    environment:
+      - FT_PROVIDER=ccxt
+
+    command: >
+      trade
+      --config /freqtrade/config/config-dev.json
+      --strategy StarterStrategy_V01
+      --freqaimodel XGBoostRegressor
+      --db-url sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite
+      --logfile /freqtrade/user_data/logs/freqtrade.log
+      --userdir /freqtrade/user_data
+      -v
+
+networks:
+  default:
+    driver: bridge

@@ -1,0 +1,60 @@
+---
+description: Freqtrade and FreqAI documentation links, best practices, and authoritative resource references for strategy development — apply when looking up API references, documentation, or code examples
+alwaysApply: false
+---
+
+# Freqtrade & FreqAI Documentation & Resources
+
+The absolute best source for programming documentation on Freqtrade and its machine learning extension, FreqAI, is the **official documentation** hosted at [www.freqtrade.io](https://www.freqtrade.io).
+
+Because Freqtrade is a rapidly evolving open-source project, relying on third-party blogs or older tutorials often leads to "broken code" due to breaking changes in the strategy interface (e.g., the transition from version 2 to version 3).
+
+---
+
+## 1. Official Freqtrade Documentation
+
+The official site is divided into logical sections that cover everything from basic setup to advanced strategy coding.
+
+| Section | Link | Best For |
+|---------|------|----------|
+| **Strategy Customization** | [freqtrade.io/strategy-customization](https://www.freqtrade.io/en/stable/strategy-customization/) | The "Bible" for programmers — IStrategy interface, candle data (OHLCV) handling via Pandas, entry/exit signals |
+| **Technical Indicators** | [strategy-customization#indicators](https://www.freqtrade.io/en/stable/strategy-customization/#technical-indicators) | TA-Lib, pandas-ta, and custom technical indicators |
+| **The Dataframe Ecosystem** | [strategy-customization#dataframe](https://www.freqtrade.io/en/stable/strategy-customization/#dataframe) | How Freqtrade uses Pandas dataframes to process market data without lookahead bias |
+
+---
+
+## 2. FreqAI Documentation
+
+FreqAI is integrated into the main Freqtrade documentation but lives in its own high-level category.
+
+| Section | Link | Best For |
+|---------|------|----------|
+| **FreqAI Introduction** | [freqtrade.io/freqai](https://www.freqtrade.io/en/stable/freqai/) | ML pipeline: Features → Labels → Training → Inference |
+| **FreqAI Configuration & Models** | [freqai-configuration](https://www.freqtrade.io/en/stable/freqai-configuration/) | Class structure (IFreqaiModel), custom models with XGBoost, CatBoost, LightGBM |
+| **Feature Engineering** | [freqai-feature-engineering](https://www.freqtrade.io/en/stable/freqai-feature-engineering/) | Defining parameters the AI uses to learn market patterns |
+
+---
+
+## 3. Secondary Technical Sources
+
+| Resource | Link | Best For |
+|----------|------|----------|
+| **Freqtrade GitHub (develop branch)** | [github.com/freqtrade/freqtrade/tree/develop](https://github.com/freqtrade/freqtrade/tree/develop) | Power users — read `.md` files in `docs/` for latest features before stable release |
+| **Freqtrade Discord** | [discord.gg/p7nuUNVfP7](https://discord.gg/p7nuUNVfP7) | Programming hurdles — `#strategy-development` and `#freqai` for peer review from core developers |
+| **Strategy Repository** | [github.com/freqtrade/freqtrade-strategies](https://github.com/freqtrade/freqtrade-strategies) | Code examples — see how others write complex logic |
+
+---
+
+## Summary Table
+
+| Resource Type | Recommended Link | Best For |
+|---------------|------------------|----------|
+| Primary Docs | [freqtrade.io](https://www.freqtrade.io/en/stable/) | General usage and API reference |
+| AI Specialist | [FreqAI Section](https://www.freqtrade.io/en/stable/freqai/) | Machine learning integration |
+| Code Examples | [Strategy Repository](https://github.com/freqtrade/freqtrade-strategies) | Seeing how others write complex logic |
+
+---
+
+## Pro Tip: Interface Version
+
+Always check the `INTERFACE_VERSION` in code examples you find online. If it's **2**, you'll likely need to migrate it to version **3** using the [Strategy Interface Version](https://www.freqtrade.io/en/stable/strategy-customization/#strategy-interface-version) docs and [changelog](https://github.com/freqtrade/freqtrade/releases) to work with current versions of the bot.

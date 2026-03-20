@@ -1,0 +1,39 @@
+---
+description: Quant trading, Python, FreqAI, and backtesting technical standards — apply when working on strategy files, FreqAI models, or backtesting configuration
+alwaysApply: false
+---
+
+# Strategy & Quant Technical Standards
+
+## Look-Ahead Bias Enforcement
+
+- **Never** use future price data (e.g., `shift(-n)`, forward-looking `rolling()`) in feature engineering or label generation.
+- If a label or feature references data that would not be available at candle close, flag it immediately.
+- In Freqtrade/FreqAI, all `%-` prefixed features must be computable from data available at the current candle only.
+
+## FreqAI-Specific Standards
+
+- FreqAI probability / prediction column names are set by the model's `predict()` method. Never assume `&s_LABEL_prob` format — verify from source or saved `.feather` predictions.
+- Walk-forward backtesting (`backtest_period_days`) is the primary evaluation method. Do not treat the training window as out-of-sample performance.
+- `random_state` in `data_split_parameters` breaks temporal ordering and must not be used for time-series models.
+- `do_predict == 1` (DI threshold filter) must be respected in entry logic to avoid trading outside the training distribution unless you have a deliberate reason not to.
+
+## Python / Pandas Best Practices
+
+- After any `bool_series.shift(n)`, dtype silently becomes `object` in pandas 2.x. Always `.fillna(False).astype(bool)` before combining with `&` or `|`.
+- Avoid `dataframe.apply(lambda ...)` for row-wise indicator computation — use vectorised pandas/numpy equivalents.
+- Never use `df.iterrows()` for feature engineering. All computation must be vectorised.
+- Replace `0` denominators before division: use `.replace(0, np.nan)` to prevent silent inf/NaN propagation.
+
+## Backtesting Integrity
+
+- A strategy producing 0 trades is often a code bug (wrong column names, dtype mismatch, unsupported API in backtesting mode), not a valid filtering outcome. Diagnose before concluding the strategy is too conservative.
+- `Trade.get_trades()` is not available in backtesting mode. Catch `NotImplementedError` explicitly and degrade gracefully.
+- `custom_stoploss` return value is relative to `current_rate`. A stop floor tighter than the typical intracandle range for the timeframe can fire immediately.
+- `max_open_trades: 0` disables trading in backtesting. Use `-1` for unlimited or a positive integer.
+
+## Risk & Leverage
+
+- Never set leverage without verifying the corresponding stoploss width. High leverage + tight stop = near-certain immediate stop-out.
+- Portfolio exposure checks that use `Trade.get_trades()` must degrade gracefully in backtesting mode rather than silently blocking all entries.
+- Dynamic leverage depending on `dp.get_analyzed_dataframe()` must handle the empty-dataframe case with a safe numeric default.

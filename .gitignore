@@ -1,0 +1,46 @@
+# Freqtrade specific ignores
+user_data/data/
+user_data/logs/
+user_data/models/
+user_data/backtest_results/
+user_data/hyperopt_results/
+user_data/plot/
+user_data/tradesv3.sqlite*
+user_data/tradesv3*.sqlite*
+user_data/chat_sessions/
+
+# Local configs — only template is tracked
+config/config*.json
+!config/config-template.json
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+.env
+.envrc
+
+# Testing / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Cursor — keep rules, ignore local noise
+.cursorignore
+.cursorindexingignore
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
+# OS
+.DS_Store
+Thumbs.db
