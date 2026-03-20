@@ -125,13 +125,18 @@ def _open_zip_csv(zip_path: Path, dtypes: dict | None = None) -> pd.DataFrame | 
     """Extract the single CSV from a ZIP file and return as DataFrame."""
     try:
         with zipfile.ZipFile(zip_path) as zf:
-            csv_name = zf.namelist()[0]
+            csv_names = [n for n in zf.namelist() if n.endswith(".csv")]
+            if not csv_names:
+                logger.error("No CSV found in %s (entries: %s)", zip_path.name, zf.namelist())
+                return None
+            csv_name = csv_names[0]
             with zf.open(csv_name) as f:
                 df = pd.read_csv(
                     io.TextIOWrapper(f, encoding="utf-8"),
                     header=0,
                     dtype=dtypes,
                 )
+        logger.debug("Columns in %s: %s", csv_name, df.columns.tolist())
         return df
     except Exception as exc:
         logger.error("Failed to read %s: %s", zip_path.name, exc)
@@ -367,7 +372,7 @@ def write_output(df: pd.DataFrame, symbol: str, day: date) -> None:
 
 def process_symbol(symbol: str, start: date, end: date) -> None:
     """Download, process, and write features for all days in [start, end]."""
-    logger.info("Processing %s: %s ->%s", symbol, start, end)
+    logger.info("Processing %s: %s -> %s", symbol, start, end)
 
     day_range = [start + timedelta(days=i) for i in range((end - start).days + 1)]
     prev_buf  = pd.DataFrame()   # carry-over from previous day
@@ -391,15 +396,14 @@ def process_symbol(symbol: str, start: date, end: date) -> None:
             days_skipped += 1
             continue
 
-        book   = load_book_ticker(symbol, day)
-        trades = load_agg_trades(symbol, day)
-
+        book = load_book_ticker(symbol, day)
         if book is None or book.empty:
             logger.warning("%s %s: bookTicker unavailable — skipping.", symbol, date_str)
             days_skipped += 1
             prev_buf = pd.DataFrame()   # reset buffer — gap in data
             continue
 
+        trades = load_agg_trades(symbol, day)
         if trades is None or trades.empty:
             logger.warning("%s %s: aggTrades unavailable — skipping.", symbol, date_str)
             days_skipped += 1
