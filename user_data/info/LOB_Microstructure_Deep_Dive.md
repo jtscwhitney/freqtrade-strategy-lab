@@ -9,10 +9,22 @@
 > Also read `user_data/info/AlgoTrading_Research_Log.md` for project-wide context, roles, and objectives.
 
 ### Current Status
-- **Phase:** 0 — LOB Data Collection Sidecar (NOT YET STARTED)
-- **Last completed:** Deep Dive document created. Dev plan (`LOB_Microstructure_Dev_Plan.md`) superseded by this file.
-- **Next immediate step:** Build `sidecar/lob_collector.py` and `sidecar/lob_features.py`.
-- **Open decisions:** None blocking. Begin Phase 0 implementation.
+- **Phase:** 0 — LOB Data Collection (ACTIVE — run historical download to populate training data)
+- **Last completed:** All Phase 0 code built and committed. `lob_features.py`, `lob_collector.py`, `lob_historical.py`, `Dockerfile.lob`, docker-compose service `lobcollect` all in place.
+- **Next immediate step:** Run the historical downloader to collect 30+ days of training data, then proceed to Phase 1.
+- **Open decisions:** None blocking.
+
+### Run Historical Download (do this now)
+```
+# Default: last 30 days, BTC + ETH (~8 GB download, outputs to sidecar/data/lob_raw/)
+python sidecar/lob_historical.py
+
+# Longer history for better regime diversity (recommended: 90 days)
+python sidecar/lob_historical.py --start 2024-12-01 --end 2025-03-19
+
+# Check output
+ls sidecar/data/lob_raw/BTCUSDT/
+```
 
 ### Key Commands
 ```
@@ -32,10 +44,13 @@ ls -lh sidecar/data/lob_raw/
 ### File Locations
 | File | Status | Purpose |
 |---|---|---|
-| `sidecar/lob_collector.py` | **To build (Phase 0)** | WebSocket LOB capture + feature computation + inference |
-| `sidecar/lob_features.py` | **To build (Phase 0)** | Feature engineering functions (shared by sidecar + training) |
+| `sidecar/lob_features.py` | **BUILT** | Feature engineering functions — pure, no I/O, shared by sidecar + training |
+| `sidecar/lob_collector.py` | **BUILT** | Live WebSocket LOB capture (bookTicker + aggTrade), 1s snapshots, Parquet output |
+| `sidecar/lob_historical.py` | **BUILT** | Historical data downloader — data.binance.vision bookTicker + aggTrades → same Parquet schema |
+| `sidecar/Dockerfile.lob` | **BUILT** | Docker image for live collector |
 | `sidecar/logs/lob_collector.log` | Auto-created | Sidecar health log |
-| `sidecar/data/lob_raw/` | Auto-created | Raw 1-second LOB snapshots (Parquet, partitioned by symbol/date) |
+| `sidecar/data/lob_raw/` | Auto-created | 1-second LOB feature snapshots (Parquet, partitioned by symbol/date) |
+| `sidecar/data/download_cache/` | Auto-created | Cached ZIP downloads — safe to delete after processing |
 | `user_data/models/lob_catboost_v01.cbm` | To create (Phase 1) | Trained CatBoost model |
 | `user_data/data/lob_signal_data.json` | To create (Phase 2) | Live inference output — read by Freqtrade strategy |
 | `user_data/strategies/LOBMicroStrategy_V01.py` | To build (Phase 2) | Freqtrade strategy |
@@ -247,8 +262,13 @@ ofi_net (order flow imbalance), cum_ofi, buy_vwap_dev, sell_vwap_dev
 | LiqCascade impact | No performance degradation, no port conflicts |
 | Data volume | Files being written at expected rate (~15 MB/day/symbol) |
 
-**Results (to be filled in):**
-> *[Awaiting Phase 0 completion]*
+**Key discovery (2026-03-20):** Binance's public data portal (`data.binance.vision`) provides free historical `bookTicker` and `aggTrades` downloads for USD-M Futures going back to ~2020. Both contain exactly the fields needed for our feature set. This eliminates the 14-day live collection wait — months of training data are available immediately via `lob_historical.py`.
+
+**Note on bookTicker data quality:** Files from January 2024 onward contain rows interleaved out of chronological order (known Binance bug, unresolved). The historical script handles this by sorting on `(event_time, update_id)` after load.
+
+**Results:**
+- Code complete: `lob_features.py`, `lob_collector.py`, `lob_historical.py`, `Dockerfile.lob`, docker-compose service
+- Historical download not yet run — **do this before proceeding to Phase 1**
 
 ---
 
@@ -421,7 +441,9 @@ This gives the model temporal structure without manually engineering lags.
 | 2026-03-20 | Test signal survival before committing to execution path | Paper's edge is 1–3s. We cannot assume it survives Freqtrade's 1m minimum. Explicit test in Phase 1 gates the rest of development. |
 | 2026-03-20 | Reuse CRISIS gate + EMA200 from LiqCascade | Already validated as a regime context filter. No reason to re-engineer. |
 | 2026-03-20 | Start with BTC/ETH only | Match LiqCascade pairs for cross-strategy analysis. Paper shows features are portable — expand after Phase 2 validation. |
-| 2026-03-20 | Forward-test only (no historical LOB backtesting) | No free historical LOB data source available. Same decision made for LiqCascade Phase 3 — acceptable per project objectives. |
+| 2026-03-20 | Use `@bookTicker` stream (not `@depth5@100ms`) | bookTicker gives L1 as complete event-driven snapshots — no diff-based local order book management required. Simpler and more reliable. |
+| 2026-03-20 | Historical data via data.binance.vision — no 14-day wait | bookTicker + aggTrades freely available back to 2020. lob_historical.py downloads, resamples to 1s, computes features in same schema as live collector. |
+| 2026-03-20 | Vectorized feature computation (pandas rolling) for historical pipeline | Row-by-row Python loop over 86,400 rows/day would be slow. Vectorized rolling ops on 1-second aggregated data is fast and correct. Day-boundary accuracy handled via carry-over trade buffer. |
 
 ---
 
@@ -461,4 +483,4 @@ Questions to be answered by evidence, not assumptions.
 ---
 
 *Document maintained by: Claude Sonnet 4.6 + project co-developer*
-*Last updated: 2026-03-20 — Initial creation. Supersedes LOB_Microstructure_Dev_Plan.md.*
+*Last updated: 2026-03-20 — Phase 0 code complete. lob_features.py, lob_collector.py, lob_historical.py built and committed. Historical download path discovered (data.binance.vision) — eliminates 14-day live collection wait. Ready to run historical download and proceed to Phase 1.*
