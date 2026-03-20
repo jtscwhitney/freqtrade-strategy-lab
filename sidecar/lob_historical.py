@@ -58,16 +58,6 @@ LOG_PATH   = BASE_DIR / "sidecar" / "logs" / "lob_historical.log"
 # ── Binance data portal ───────────────────────────────────────────────────────
 _PORTAL = "https://data.binance.vision/data/futures/um/daily"
 
-# ── CSV column definitions (no header row in Binance files) ──────────────────
-_BOOK_TICKER_COLS = [
-    "update_id", "best_bid_price", "best_bid_qty",
-    "best_ask_price", "best_ask_qty", "transaction_time", "event_time",
-]
-_AGG_TRADES_COLS = [
-    "agg_trade_id", "price", "qty", "first_trade_id",
-    "last_trade_id", "transact_time", "is_buyer_maker",
-]
-
 # ── Parquet schema (must match lob_collector.py) ──────────────────────────────
 _SCHEMA = pa.schema(
     [("timestamp_utc", pa.float64()), ("symbol", pa.string())]
@@ -112,7 +102,7 @@ def _download_zip(url: str, cache_path: Path) -> Path | None:
     try:
         resp = requests.get(url, timeout=120, stream=True)
         if resp.status_code == 404:
-            logger.debug("Not found (404): %s", url)
+            logger.info("Not found (404): %s", url)
             return None
         resp.raise_for_status()
 
@@ -131,8 +121,7 @@ def _download_zip(url: str, cache_path: Path) -> Path | None:
         return None
 
 
-def _open_zip_csv(zip_path: Path, col_names: list[str],
-                  dtypes: dict | None = None) -> pd.DataFrame | None:
+def _open_zip_csv(zip_path: Path, dtypes: dict | None = None) -> pd.DataFrame | None:
     """Extract the single CSV from a ZIP file and return as DataFrame."""
     try:
         with zipfile.ZipFile(zip_path) as zf:
@@ -140,8 +129,7 @@ def _open_zip_csv(zip_path: Path, col_names: list[str],
             with zf.open(csv_name) as f:
                 df = pd.read_csv(
                     io.TextIOWrapper(f, encoding="utf-8"),
-                    names=col_names,
-                    header=None,
+                    header=0,
                     dtype=dtypes,
                 )
         return df
@@ -166,7 +154,7 @@ def load_book_ticker(symbol: str, day: date) -> pd.DataFrame | None:
     if zip_path is None:
         return None
 
-    df = _open_zip_csv(zip_path, _BOOK_TICKER_COLS, dtypes={
+    df = _open_zip_csv(zip_path, dtypes={
         "update_id":        "int64",
         "best_bid_price":   "float64",
         "best_bid_qty":     "float64",
@@ -197,7 +185,7 @@ def load_book_ticker(symbol: str, day: date) -> pd.DataFrame | None:
         0.0,
     )
 
-    # Convert ms → integer seconds, then keep LAST update per second
+    # Convert ms -> integer seconds, then keep LAST update per second
     df["ts_s"] = df["transaction_time"] // 1000
     df = (
         df.groupby("ts_s", sort=True)
@@ -225,7 +213,7 @@ def load_agg_trades(symbol: str, day: date) -> pd.DataFrame | None:
     if zip_path is None:
         return None
 
-    df = _open_zip_csv(zip_path, _AGG_TRADES_COLS, dtypes={
+    df = _open_zip_csv(zip_path, dtypes={
         "agg_trade_id":    "int64",
         "price":           "float64",
         "qty":             "float64",
@@ -237,8 +225,8 @@ def load_agg_trades(symbol: str, day: date) -> pd.DataFrame | None:
     if df is None or df.empty:
         return None
 
-    # Binance: is_buyer_maker=True → buyer is maker → taker is SELLER
-    #          is_buyer_maker=False → buyer is taker → BUY aggression
+    # Binance: is_buyer_maker=True ->buyer is maker ->taker is SELLER
+    #          is_buyer_maker=False ->buyer is taker ->BUY aggression
     df["usd"]              = df["price"] * df["qty"]
     is_buy                 = ~df["is_buyer_maker"]
     df["buy_usd"]          = np.where(is_buy, df["usd"], 0.0)
@@ -372,14 +360,14 @@ def write_output(df: pd.DataFrame, symbol: str, day: date) -> None:
     }
     table = pa.table(arrays, schema=_SCHEMA)
     pq.write_table(table, out_path, compression="snappy")
-    logger.info("%s %s: wrote %d rows → %s", symbol, date_str, len(df), out_path.name)
+    logger.info("%s %s: wrote %d rows ->%s", symbol, date_str, len(df), out_path.name)
 
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────
 
 def process_symbol(symbol: str, start: date, end: date) -> None:
     """Download, process, and write features for all days in [start, end]."""
-    logger.info("Processing %s: %s → %s", symbol, start, end)
+    logger.info("Processing %s: %s ->%s", symbol, start, end)
 
     day_range = [start + timedelta(days=i) for i in range((end - start).days + 1)]
     prev_buf  = pd.DataFrame()   # carry-over from previous day
@@ -466,7 +454,7 @@ def main() -> None:
     days = (end - start).days + 1
     logger.info("LOB historical preprocessor starting.")
     logger.info("Symbols : %s", args.symbols)
-    logger.info("Range   : %s → %s (%d days)", start, end, days)
+    logger.info("Range   : %s ->%s (%d days)", start, end, days)
     logger.info("Output  : %s", DATA_DIR)
     logger.info("Cache   : %s", CACHE_DIR)
 
