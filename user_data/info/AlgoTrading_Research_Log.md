@@ -1,6 +1,6 @@
 # AlgoTrading Research Log
 ## Maintained by: [Developer] + Claude (any model)
-## Last Updated: 2026-03-20
+## Last Updated: 2026-03-22
 ## Stack: Cursor / Freqtrade / FreqAI / Claude Opus 4.6
 
 ---
@@ -15,9 +15,10 @@
 - **Approach Registry (Section 4):** Everything we've tried, what's currently active, and what's been identified as a candidate. This is the project memory — check it before suggesting anything to avoid re-treading ground.
 - **Sourcing Configuration (Section 5):** Where we look for new strategy ideas and what search terms to use.
 - **Evaluation Filter (Section 6):** The 7-point checklist every candidate must pass before we commit development time.
-- **Sourcing Sweep Log (Section 7):** Record of each research sweep — what was searched, what was found, what was promoted.
-- **Lessons & Principles (Section 8):** Hard-won insights from past projects that apply across all future work.
-- **Version History (Section 9):** Change log for this file.
+- **Techniques Library (Section 7):** Reusable techniques, tools, and methods that are not standalone strategies but can strengthen candidates during evaluation, development, or operation. Claude should mine this section when evaluating new candidates and when diagnosing deficiencies in active strategies.
+- **Sourcing Sweep Log (Section 8):** Record of each research sweep — what was searched, what was found, what was promoted.
+- **Lessons & Principles (Section 9):** Hard-won insights from past projects that apply across all future work.
+- **Version History (Section 10):** Change log for this file.
 
 **How to use it:**
 - **Developer:** Upload this file at the start of every research or strategy session with Claude. When changes are made during a session, download the updated version and replace your local copy. Keep it in version control (`user_data/info/AlgoTrading_Research_Log.md`).
@@ -48,7 +49,7 @@ Claude and the developer are **equal partners** — Co-Investigators, Co-Strateg
 
 ## 2. Objectives
 
-**Goal:** Investigate, develop, and deploy novel crypto algorithmic trading systems that significantly outperform traditional investment strategies. The developer already has capital in conventional approaches — the systems built here must justify their complexity with materially higher returns.
+**Goal:** Investigate, develop, and deploy crypto algorithmic trading systems — whether novel, adapted from established approaches, or assembled from combinations of known techniques — that significantly outperform traditional investment strategies. The developer already has capital in conventional approaches — the systems built here must justify their complexity with materially higher returns.
 
 **Risk tolerance:** High. Willing to accept elevated risk for elevated returns.
 
@@ -66,13 +67,31 @@ These are the fixed realities that every approach must fit within.
 |---|---|
 | **Framework** | Freqtrade (Python, Docker) with FreqAI for ML models |
 | **IDE / AI** | Cursor with Claude Opus 4.6 as co-developer |
-| **Compute** | DigitalOcean VPS (no GPU); local machine for backtesting |
-| **Markets** | Crypto futures (Binance Perpetuals). Primary: BTC/USDT, ETH/USDT |
-| **Data budget** | Free or very low cost. CCXT, Binance API, CoinGecko, public APIs |
+| **Compute** | Cloud VPS (currently DigitalOcean) for live/dry-run; local machine for backtesting. Non-GPU preferred but not required — GPU instances are acceptable if a candidate's ROI justifies the cost. |
+| **Markets** | Crypto futures primarily (Binance Perpetuals as default). Freqtrade supports many exchanges. See Section 3.1 on cross-asset proxies. |
+| **Data budget** | Free or low-cost preferred. CCXT, Binance API, CoinGecko, public APIs. Will consider paid data sources if the potential ROI is compelling or if ongoing development of a proven candidate shows that paid data would materially improve performance. |
 | **Leverage** | 2–4x typical |
 | **Execution** | Freqtrade's standard execution (not HFT, not co-located) |
 | **Developer** | Solo. All code written with AI assistance in Cursor |
 | **Libraries** | Python ecosystem: scikit-learn, XGBoost, LightGBM, PyTorch (for inference, not heavy training), TA-Lib, pandas, numpy. Open to others if lightweight |
+
+### 3.1 Cross-Asset Proxy Pairs
+
+All execution must happen via Freqtrade — that constraint is fixed. Our primary exchange is Binance, but Freqtrade supports many exchanges (Bybit, OKX, Kraken, Gate.io, etc.). If a candidate requires a specific exchange feature or a pair only available elsewhere, that's not an automatic rejection — evaluate on merits. However, strategies originating from non-crypto asset classes (gold, equities, forex, commodities) are eligible **if** a liquid proxy pair exists on a Freqtrade-supported exchange. We don't actively sweep non-crypto sources, but if a cross-asset approach surfaces during a normal sweep, we don't reject it on the basis of the underlying asset class alone.
+
+**Before evaluating any cross-asset candidate**, verify the proxy pair exists on a Freqtrade-supported exchange with sufficient liquidity (24h volume > $10M) and that the proxy actually tracks the underlying asset. Tokenized assets can decouple from their reference during stress events.
+
+**Known liquid proxy pairs (Binance examples — check other exchanges too):**
+
+| Asset Class | Underlying | Binance Proxy Pair | Notes |
+|---|---|---|---|
+| Gold | XAU/USD | PAXG/USDT (spot) | No perpetual futures — spot only. Check if perp has been listed. |
+| Forex-like | USD strength | Stablecoin pairs (e.g., EUR-pegged tokens) | Very limited liquidity on most. |
+| Equity-correlated | Tech/risk-on | BTC and ETH themselves correlate with NASDAQ in macro regimes | Not a direct proxy but relevant for cross-asset signal strategies. |
+| Oil/Energy | Crude oil | No direct proxy | — |
+| DeFi index | DeFi sector | Various DeFi tokens (UNI, AAVE, etc.) | Liquid on Binance Futures but loosely correlated to each other. |
+
+*This table is a starting reference, not exhaustive. Exchange listings change. Always verify before committing to a candidate.*
 
 ---
 
@@ -128,7 +147,7 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
   - Fee break-even requires ~63 bps mean move at 3s under normal conditions — structurally impossible.
   - Paper's profitability was almost certainly produced under institutional fee tiers (VIP: 0.02–0.04%/side) or maker execution (which the paper itself flagged as catastrophically failing during flash crashes).
 - **Secondary constraint:** bookTicker historical data is not available on data.binance.vision for USD-M Futures. L1 book features (spread, bid/ask qty, vol_imbalance) were NaN throughout training — model used 9 aggTrade-derived features only, not the full feature set from the paper. Whether L1 features would have changed the fee economics is unknown, but the structural 6× gap makes it unlikely.
-- **Key lessons:** See Section 8, items 7 and 8.
+- **Key lessons:** See Section 9, items 7 and 8.
 - **Potential future salvage:** The LOB OFI signal could serve as a timing confirmation filter for LiqCascade entries (no standalone execution required; no fee problem). Not prioritized — pursue only if LiqCascade Phase 3 data shows a high false-positive entry rate.
 - **Deep dive:** `LOB_Microstructure_Deep_Dive.md` (ARCHIVED)
 
@@ -141,15 +160,17 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Core idea:** Detect forced liquidation cascades via Binance WebSocket data as primary alpha signal. Regime framework demoted to context filter only (CRISIS gate + EMA200 macro trend)
 - **Architecture:** Sidecar process (WebSocket liquidation stream) → signal file → Freqtrade 5m strategy reads signal → enter with-trend cascade, exit via 2×ATR target / 1×ATR stop / 30min time stop. 4x leverage
 - **Why this is different from RAME:** Alpha source is a mechanical market event (forced liquidations), not indicator prediction. Signal is directionally unambiguous while occurring. Not lagged — detected in real time
-- **Current deployment:** DigitalOcean droplet, Docker, BTC/USDT + ETH/USDT futures dry-run
-- **Phase plan:** Phase 3 (dry-run, 4+ weeks) → Phase 4 (hyperopt) → Phase 5 (multi-pair) → Phase 6 (live capital)
-- **Go/no-go for next phase:** 20+ trades, profit factor > 1.0, win rate > 40%, sidecar uptime > 99%
+- **Current deployment:** DigitalOcean droplet, Docker, 5 pairs dry-run: BTC/USDT, ETH/USDT, SOL/USDT, BNB/USDT, XRP/USDT. max_open_trades=5.
+- **Phase plan:** Phase 3 (dry-run, 4+ weeks) → Phase 3.5 (LOB-OFI+OI filter validation) → Phase 4 (hyperopt) → Phase 5 (additional pairs if needed) → Phase 6 (live capital)
+- **Go/no-go for Phase 4:** 20+ trades, profit factor > 1.0, win rate > 40%, sidecar uptime > 99%
+- **Phase 3.5 (ACTIVE — 2026-03-21):** OI change rate instrumentation deployed to sidecar. `oi_contracts` and `oi_change_pct_1m` now logged per symbol per minute in `signal_history.jsonl`. Enables retrospective validation of LOB-OFI+OI entry filter once 20+ trades accumulated. Strategy V04 unchanged. See Deep Dive Phase 3.5 for full details.
 - **Open questions:**
   1. Counter-trend cascade quality (short squeezes in bear markets)
   2. Optimal proxy thresholds (VOL_SPIKE_MULT, CANDLE_BODY_MULT)
   3. ATR-relative vs fixed ROI targets
   4. Funding rate as entry pre-condition
   5. Cascade failure mode characterization
+  6. LOB-OFI + OI filter utility — does OI change rate at cascade detection predict 15–35 min trade outcomes? (Phase 3.5 retrospective analysis)
 - **Deep dive:** `LiquidationCascade_Deep_Dive.md`
 
 ---
@@ -182,39 +203,78 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Evaluation filter score:** Not yet scored
 - **Complementarity to existing:** MEDIUM — the preprocessing technique could be valuable as infrastructure for any future ML-based strategy.
 
+#### CANDIDATE E: Path Signatures for Lead-Lag Detection
+- **Source:** Rough path theory literature (SSRN, arXiv); libraries: `iisignatures`, `esig`
+- **Core idea:** Use path signatures (from rough path theory) to summarize the "shape" of recent multi-asset price paths into a compact mathematical representation, then feed that into a simple model (even linear regression) to detect lead-lag relationships — e.g., when ETH is about to follow BTC's move based on the geometric structure of their recent paths.
+- **Why it's interesting for us:** Theoretically grounded in serious mathematics (not data-mining). Replaces dozens of hand-crafted indicators with a single principled representation. Works on standard OHLCV data — no sidecar needed, no special data source. Libraries are lightweight and CPU-friendly. Simple downstream models (linear/logistic regression) reduce overfitting risk vs deep learning. Lead-lag detection between correlated crypto pairs could generate frequent trades across multiple pairs simultaneously (addresses trade frequency objective). Different alpha source from everything else in our registry.
+- **Potential concerns:** BTC-ETH lead-lag is well-studied and may be largely arbitraged at our execution timeframes. Need to verify whether signatures detect lead-lag faster/more reliably than simpler correlation-based approaches. Most path signature trading papers are on equities, not crypto — need to search for crypto-specific validation. The "shape" features may be sensitive to the lookback window chosen.
+- **Evaluation filter score:** Not yet scored — needs targeted literature search first
+- **Complementarity to existing:** HIGH — entirely different alpha source (cross-asset geometric patterns vs microstructure events). Could run on standard Freqtrade candles with no infrastructure changes.
+
 ---
 
 ## 5. Sourcing Configuration
 
-### 5.1 Primary Sources (Claude checks these during sweeps)
+### 5.1 Primary Sources (Claude checks these during every sweep)
 
 | Source | Type | Access | Focus |
 |---|---|---|---|
-| **SSRN** | Academic preprints | Free, searchable | Novel quantitative strategies, financial ML |
-| **arXiv (q-fin)** | Academic preprints | Free, searchable | Cutting-edge ML/DL applied to markets |
-| **Quantpedia blog** | Strategy database | Free tier (~70 strategies) | Academic strategies translated to trading rules |
-| **Oxford-Man Institute** | Academic research | Newsletter + public papers | ML for quant finance, market microstructure |
+| **SSRN** | Academic preprints | Free, searchable, most papers full-text | Novel quantitative strategies, financial ML |
+| **arXiv (q-fin)** | Academic preprints | Free, full-text | Cutting-edge ML/DL applied to markets |
+| **Quantpedia blog** | Strategy database | Free tier (~70 strategies). Premium ($599/yr) unlocks 900+ strategies with out-of-sample backtests and Python code. **See 5.5 for paid access recommendation.** | Academic strategies translated to plain-language trading rules |
+| **Oxford-Man Institute** | Academic research | Newsletter + public papers (some link to paywalled journals) | ML for quant finance, market microstructure, regime detection |
 
-### 5.2 Secondary Sources (checked when primary sources don't surface enough)
+### 5.2 Applied / Practitioner Sources
+
+| Source | Type | Access | Focus |
+|---|---|---|---|
+| **QuantStart** | Blog + courses | Free blog, paid courses | Practical strategy implementation, Python, backtesting infrastructure |
+| **Robot Wealth** | Blog + community | Free blog | Practical quant trading for retail, fee-aware analysis, crypto strategies |
+| **The Quant's Playbook** (Substack) | Newsletter | Free + paid tiers | Accessible breakdowns of quant strategies, code examples |
+| **r/algotrading, r/quant** (Reddit) | Community forums | Free | Practitioner discussion, implementation tips, reality checks on academic claims |
+| **QuantConnect community** | Forums + shared strategies | Free | Implemented strategies with backtests, QuantConnect/Lean framework |
+| **Freqtrade Discord / GitHub** | Community | Free | Freqtrade-specific strategies, FreqAI examples |
+| **QuantInsti blog / Quantra** | Blog + courses | Free blog, paid courses | End-to-end strategy walkthroughs, Python implementations |
+
+### 5.3 Secondary Academic Sources
 
 | Source | Type | Access | Focus |
 |---|---|---|---|
 | **IEEE Xplore** | Peer-reviewed journals | Abstracts free, papers often paywalled | Signal processing, neural architectures for time series |
 | **Journal of Financial Data Science** | Peer-reviewed | Some open access | ML applications in finance |
-| **QuantConnect community** | Forums + shared strategies | Free | Implemented strategies with backtests |
-| **Freqtrade Discord / GitHub** | Community | Free | Freqtrade-specific ML strategies |
+| **Quantocracy** | Aggregator | Free | Curates blog posts from dozens of quant blogs — good for discovering new sources |
 
-### 5.3 Search Terms for Sourcing Sweeps
+### 5.4 Reference Literature
+
+Key books that inform our approach. Claude cannot access these directly but should reference their concepts when relevant. The developer has or can acquire electronic copies.
+
+| Book | Author | Why It Matters |
+|---|---|---|
+| **Advances in Financial Machine Learning** | Marcos López de Prado | Foundational. Fractional differentiation (now in our Techniques Library), meta-labeling, triple barrier method, combinatorial purged cross-validation. The methodological standard for ML in trading. |
+| **Machine Learning for Algorithmic Trading** (2nd ed.) | Stefan Jansen | Practical companion to de Prado. Feature engineering, model selection, NLP for trading, full Python implementations. 820 pages of applied ML for markets. |
+| **Algorithmic Trading: Winning Strategies and Their Rationale** | Ernest P. Chan | Mean reversion, momentum, Kalman filters, regime changes. Practical and honest about what works and what doesn't. |
+| **Python for Finance** (2nd ed.) | Yves Hilpisch | Python-specific reference for financial data handling, analysis, and modeling. Useful as a coding reference. |
+| **Trading and Exchanges: Market Microstructure for Practitioners** | Larry Harris | Deep understanding of how markets actually work — order types, dealers, market makers. Relevant background for any microstructure-based strategy. |
+
+### 5.5 Paid Access Recommendations
+
+**Quantpedia Premium ($599/yr)** — The single highest-value paid source for our workflow. Premium unlocks 900+ strategy ideas with descriptions, performance characteristics, links to source academic papers, and 800+ out-of-sample backtests with Python code. New strategies are added bi-weekly, and around 5–10 new backtests are added bi-weekly as well. This is essentially a pre-filtered, pre-summarized version of what we do manually during sourcing sweeps — someone has already read thousands of papers and extracted the implementable ones. At $599/yr, if it surfaces even one viable candidate we wouldn't have found otherwise, it pays for itself many times over. **Recommendation: consider subscribing when we're ready for Sweep #2 or after LiqCascade Phase 3 concludes.**
+
+**Reference books (~$50–150 total for electronic copies)** — De Prado and Jansen specifically. These aren't sourcing tools but they inform *how* we build. De Prado's methodological framework (purged CV, fractional differentiation, meta-labeling) is already influencing our work indirectly. Having the actual text would let Claude reference specific techniques when relevant during Cursor sessions.
+
+**No other paid sources recommended at this time.** SSRN, arXiv, and the practitioner blogs provide sufficient coverage for sweeps. IEEE Xplore paywalls are annoying but the abstracts usually contain enough to decide if a paper is worth pursuing, and the underlying papers often appear on arXiv anyway.
+
+### 5.6 Search Terms for Sourcing Sweeps
 
 Rotate and combine these across sources:
 
 **Core:** `algorithmic trading strategy`, `crypto trading ML`, `systematic trading`
 
-**Architecture-specific:** `state space model trading`, `temporal fusion transformer finance`, `reinforcement learning trading`, `hawkes process order flow`, `regime detection trading`, `liquidation cascade crypto`, `order flow imbalance`
+**Architecture-specific:** `state space model trading`, `temporal fusion transformer finance`, `reinforcement learning trading`, `hawkes process order flow`, `regime detection trading`, `liquidation cascade crypto`, `order flow imbalance`, `path signatures trading`, `rough path finance`
 
-**Technique-specific:** `mean reversion crypto`, `momentum strategy ML`, `volatility forecasting`, `funding rate strategy`, `market microstructure alpha`
+**Technique-specific:** `mean reversion crypto`, `momentum strategy ML`, `volatility forecasting`, `funding rate strategy`, `market microstructure alpha`, `conformal prediction trading`, `fractional differentiation trading`
 
-**Meta/methodology:** `backtesting pitfalls`, `walk-forward validation trading`, `overfitting trading strategies`, `synthetic data augmentation finance`
+**Meta/methodology:** `backtesting pitfalls`, `walk-forward validation trading`, `overfitting trading strategies`, `synthetic data augmentation finance`, `transaction cost analysis crypto`
 
 ---
 
@@ -243,7 +303,68 @@ Before committing to implement any candidate approach, score it on these criteri
 
 ---
 
-## 7. Sourcing Sweep Log
+## 7. Techniques Library
+
+*Techniques, tools, and methods that are not standalone strategies but can strengthen candidates during evaluation, development, or live operation. Claude should scan this section when evaluating new candidates ("would any of these techniques make this candidate stronger?") and when diagnosing deficiencies in active strategies ("could one of these techniques fix this problem?").*
+
+*Status key:* `AVAILABLE` = ready to use, libraries identified · `RESEARCH` = promising but needs investigation before use · `PROVEN` = already used successfully in a project
+
+### 7.1 Uncertainty Quantification / Risk Management
+
+#### Conformal Prediction
+- **Status:** AVAILABLE
+- **What it does:** Wraps any point-prediction model to produce prediction *intervals* with a mathematical coverage guarantee (e.g., "95% of future observations will fall within this range"). Unlike Bayesian methods, makes no distributional assumptions.
+- **Libraries:** `MAPIE` (scikit-learn compatible), `nonconformist`
+- **How we'd use it:** Layer on top of any ML-based signal (e.g., CatBoost, path signatures). Only take a trade when the prediction interval is tight and entirely on one side of the entry price. This converts a noisy point estimate into a "statistically bounded" entry filter. Could significantly reduce false entries and drawdowns.
+- **When to apply:** During Phase 2+ of any ML-based candidate — after the base model is validated but before live deployment. Adds a confidence filter without changing the underlying signal.
+- **Relevant candidates:** Any future ML-based strategy; potentially Candidate E (Path Signatures) if a regression model is used.
+
+### 7.2 Feature Engineering / Preprocessing
+
+#### Fractional Differentiation
+- **Status:** AVAILABLE
+- **What it does:** Makes time series stationary while preserving long-range memory. Standard differencing (percent change) removes all price-level information; fractional differentiation removes just enough trend to achieve stationarity while retaining predictive memory of historical levels.
+- **Libraries:** `fracdiff` (Python, pip-installable)
+- **Source:** Marcos López de Prado, "Advances in Financial Machine Learning" (2018), Ch. 5. Resurgence in 2025–2026 IEEE papers on memory-augmented networks.
+- **How we'd use it:** Apply as a standard preprocessing step to any ML model that takes price data as input. Replace simple returns or percent changes with fractionally differenced series. Gives the model access to both stationarity (required for ML) and price-level memory (required for detecting support/resistance, trend structure, etc.).
+- **When to apply:** During feature engineering for any ML-based candidate. Low effort — one function call per feature column.
+- **Relevant candidates:** Candidate E (Path Signatures — could fractionally differentiate the input paths), any future FreqAI model.
+
+#### Stationarity-Preserving Preprocessing (CNN-style)
+- **Status:** RESEARCH
+- **What it does:** A novel method from SSRN (Asareh Nejad et al., 2024) that makes indicator + candlestick data stationary while preserving inter-feature relationships. Different approach from fractional differentiation — transforms the entire feature matrix jointly rather than column-by-column.
+- **Source:** Candidate D in this log (Section 4.3). Paper achieved 53.9% directional accuracy at 15m on crypto.
+- **How we'd use it:** Alternative to fractional differentiation for multi-feature preprocessing. May be better when features have cross-correlations that should be preserved.
+- **When to apply:** If fractional differentiation proves insufficient for a multi-feature model. Lower priority than fractional differentiation (less proven, less widely adopted).
+
+### 7.3 Signal Quality / Entry Filtering
+
+#### Fee Economics Threshold Sweep
+- **Status:** PROVEN (used in LOB Microstructure, 2026-03-20)
+- **What it does:** Before building execution infrastructure for any signal, sweep across signal-strength thresholds and time horizons to compute expected P&L at our actual fee tier (Binance retail: 5 bps/side = 10 bps round-trip). Identifies whether any profitable operating point exists.
+- **How we'd use it:** Run as a mandatory pre-implementation check for any candidate that relies on high-frequency signals. Takes ~30 minutes with a held-out test set. Prevents building infrastructure for signals that can't overcome fee friction.
+- **When to apply:** Immediately after Phase 1 (signal validation) for any candidate, before Phase 2 (Freqtrade integration). See Lesson #7 in Section 9.
+- **Source:** LOB Microstructure project (ARCHIVED). The sweep saved weeks of potential infrastructure work.
+
+#### LOB Order Flow Imbalance (OFI) as Confirmation Filter
+- **Status:** RESEARCH
+- **What it does:** Uses the validated OFI signal from the LOB Microstructure project (real signal, IC=0.135 at 3s) as a *confirmation filter* for entries generated by another strategy — not as a standalone trade signal (fee-incompatible for standalone use).
+- **How we'd use it:** When a primary strategy (e.g., LiqCascade) generates an entry signal, check whether the LOB OFI at that moment agrees with the direction. If OFI is neutral or opposing, skip the entry. No standalone execution → no fee problem.
+- **When to apply:** If LiqCascade Phase 3 data shows a high false-positive entry rate. Not prioritized until that need is demonstrated.
+- **Source:** LOB Microstructure project (ARCHIVED). See Section 4.1 "Potential future salvage."
+
+### 7.4 Model Optimization / Meta-Techniques
+
+#### Genetic Algorithm for Strategy Parameter Optimization (CGA-Agent)
+- **Status:** RESEARCH
+- **What it does:** Uses multi-agent genetic algorithms with real-time market microstructure feedback to optimize trading strategy parameters. Rolling 30-day reoptimization windows.
+- **Source:** arXiv 2510.07943 (2025). Reviewed but not promoted in Sweep #1.
+- **How we'd use it:** Alternative to Freqtrade's built-in Hyperopt for parameter optimization. Could be applied to any strategy's parameters (thresholds, stops, timeouts). The rolling reoptimization is interesting — addresses regime change better than static Hyperopt.
+- **When to apply:** After a strategy is validated but underperforming expectations due to parameter staleness. Lower priority than getting the base strategy right.
+
+---
+
+## 8. Sourcing Sweep Log
 
 *Each sweep gets an entry here. This prevents re-searching the same ground.*
 
@@ -262,7 +383,7 @@ Before committing to implement any candidate approach, score it on these criteri
 
 ---
 
-## 8. Lessons & Principles
+## 9. Lessons & Principles
 
 Hard-won insights that apply across all approaches. Add to this as projects conclude.
 
@@ -284,11 +405,15 @@ Hard-won insights that apply across all approaches. Add to this as projects conc
 
 ---
 
-## 9. Version History
+## 10. Version History
 
 | Date | Change |
 |---|---|
-| 2026-03-20 | v1.5 — Candidate A (LOB Microstructure) archived. Moved from Candidates to Archived (Section 4.1). Two new lessons added (Section 8, items 7–8). Related files list updated. |
+| 2026-03-22 | v1.9 — Major expansion of Sourcing Configuration (Section 5). Added Applied/Practitioner sources (QuantStart, Robot Wealth, Quant's Playbook, Reddit, QuantInsti). Added Reference Literature table (de Prado, Jansen, Chan, Hilpisch, Harris). Added Paid Access Recommendations (Quantpedia Premium highlighted). Added Quantocracy aggregator. Expanded search terms. |
+| 2026-03-22 | v1.8 — Added cross-asset proxy pair guidance to Stack & Constraints (Section 3.1). Proxy pair reference table included. |
+| 2026-03-22 | v1.7 — Added Candidate E (Path Signatures). Created Techniques Library (Section 7) with 6 entries: Conformal Prediction, Fractional Differentiation, Stationarity-Preserving Preprocessing, Fee Economics Threshold Sweep, LOB OFI Confirmation Filter, CGA-Agent Parameter Optimization. Renumbered Sections 8–10. |
+| 2026-03-21 | v1.6 — LiqCascade Phase 3.5 added: OI instrumentation deployed to sidecar, open question #6 added, phase plan updated in Deep Dive. |
+| 2026-03-20 | v1.5 — Candidate A (LOB Microstructure) archived. Moved from Candidates to Archived (Section 4.1). Two new lessons added (now Section 9, items 7–8). Related files list updated. |
 | 2026-03-20 | v1.4 — Candidate A promoted to ACTIVE. LOB_Microstructure_Deep_Dive.md created. Dev plan superseded by Deep Dive. |
 | 2026-03-20 | v1.3 — Candidate A fully evaluated (PASS with conditions). LOB_Microstructure_Dev_Plan.md created. Preamble rewritten to be fully self-contained across sessions. Related files list added. |
 | 2026-03-20 | v1.2 — First sourcing sweep completed. 4 candidates added (A–D). Sweep #1 logged. |

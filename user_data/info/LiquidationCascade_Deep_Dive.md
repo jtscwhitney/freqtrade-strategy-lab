@@ -1,5 +1,5 @@
 # Liquidation Cascade Strategy — Deep Dive
-## Version 1 | Started: 2026-03-17 | Status: ACTIVE — Phase 1 Implementation
+## Version 1 | Started: 2026-03-17 | Status: ACTIVE — Phase 3 Dry-Run + Phase 3.5 Instrumentation
 
 ---
 
@@ -10,9 +10,10 @@
 
 ### Current Status
 - **Phase:** 3 — Live Dry-Run (ACTIVE) — deployed to DigitalOcean droplet 2026-03-18
-- **Last completed (2026-03-20):** Expanded to 5 pairs (BTC/ETH/SOL/BNB/XRP), max_open_trades raised to 5. Changes deployed via git. 57 trades accumulated in DB.
-- **Next immediate step:** Monitor dry-run across all 5 pairs. Go/no-go assessment after 4 weeks minimum, evaluating pairs both individually and as a portfolio.
-- **Open decisions:** None blocking. Continue accumulating dry-run data.
+- **Last completed (2026-03-21):** Phase 3.5 instrumentation — OI change rate (`oi_contracts`, `oi_change_pct_1m`) added to sidecar snapshot and `signal_history.jsonl`. All future entries logged with OI context for retrospective LOB-OFI+OI filter validation.
+- **Previously (2026-03-20):** Expanded to 5 pairs (BTC/ETH/SOL/BNB/XRP), max_open_trades raised to 5. 57 trades accumulated in DB.
+- **Next immediate step:** Continue accumulating Phase 3 dry-run data. Go/no-go assessment after 20+ trades and 4 weeks minimum.
+- **Open decisions:** None blocking. LOB-OFI+OI filter (Phase 3.5) to be validated retrospectively once sufficient trade data is collected — see Phase 3.5 section below.
 
 ### Key Commands
 ```
@@ -47,9 +48,9 @@ bash deploy/deploy.sh
 | `user_data/strategies/LiqCascadeStrategy_V04.py` | **ACTIVE** | Phase 3 — real sidecar signal |
 | `config/config_liqcascade_V01.json` | Complete | Phase 1–3 backtest config |
 | `config/config_liqcascade_V04.json` | **ACTIVE** | Phase 3 live config (port 8082) |
-| `sidecar/liquidation_monitor.py` | **RUNNING** | Binance WebSocket liquidation pipeline |
+| `sidecar/liquidation_monitor.py` | **RUNNING** | Binance WebSocket liquidation pipeline + OI fetch (2026-03-21) |
 | `sidecar/logs/liquidation_monitor.log` | Live | Sidecar event log |
-| `sidecar/logs/signal_history.jsonl` | Live | Per-minute signal history (all pairs, all values) |
+| `sidecar/logs/signal_history.jsonl` | Live | Per-minute signal history — liq volumes, signal, OI fields (all pairs) |
 | `sidecar/import_log_trades.py` | Complete | One-time import of trades 10–13 into DB |
 | `user_data/tradesv3.dryrun.sqlite` | **ACTIVE** | Dry-run trade database |
 | `user_data/logs/freqtrade_liqcascade.log` | Live | Bot log |
@@ -631,6 +632,70 @@ Files changed: `sidecar/liquidation_monitor.py` (SYMBOLS dict), `config/config_l
 | Win rate | > 40% |
 | Sidecar uptime | > 99% |
 | Worst week drawdown | < -30% balance |
+
+---
+
+### Phase 3.5: LOB-OFI + OI Entry Filter (Instrumentation → Retrospective Validation)
+
+**Goal:** Determine whether adding microstructure context (order flow imbalance + open interest change rate) at the moment of cascade detection improves entry quality — reducing false positives without significantly reducing trade count.
+
+**Motivation:** LOB Microstructure (Candidate A, archived 2026-03-20) produced a real signal (dir_acc=54.2%, IC=0.135) but was killed by retail taker fees as a standalone scalper. As a gate on existing LiqCascade entries, the fee problem disappears — no additional trade is opened. The filter either confirms an entry or blocks it; the round-trip cost of the cascade trade itself is unchanged. OI change rate provides orthogonal information: a genuine cascade should produce rapidly falling OI (forced closures), whereas directional trading on high volume produces rising or stable OI.
+
+**Alpha sources being combined:**
+- **LiqCascade (primary):** Mechanical forced liquidation event — structural alpha
+- **OFI (confirming):** Order flow imbalance at entry moment — directional pressure aligned with cascade
+- **OI change rate (confirming):** Forced position closure confirmed by OI drop — distinguishes real cascades from high-volume momentum moves
+
+**Why OI change rate is the higher-priority filter vs LOB OFI:**
+During a genuine cascade, leveraged positions are forcibly closed → OI drops. During a strong directional move with no cascade (vol spike from news), new positions may be opened → OI rises. This distinction is exactly what the LiqCascade proxy (V01–V03) could not make — it fired on any high-volume candle. The real WebSocket signal already captures forced order flow; OI rate adds independent confirmation.
+
+**Instrumentation (COMPLETE — 2026-03-21):**
+`sidecar/liquidation_monitor.py` updated to fetch `/fapi/v1/openInterest` for all 5 symbols concurrently (thread pool, non-blocking) at each 60-second snapshot. Two fields added to every signal record:
+- `oi_contracts` — current OI in base currency (BTC, ETH, SOL, BNB, XRP)
+- `oi_change_pct_1m` — % change vs previous snapshot (null on first snapshot after restart)
+
+Both fields are written to `user_data/data/liquidation_data.json` and appended to `sidecar/logs/signal_history.jsonl`. Strategy V04 is unchanged — it reads only the `signal` field.
+
+**Expected `signal_history.jsonl` entry at a cascade event:**
+```json
+{
+  "timestamp": "2026-03-21T16:35:47+00:00",
+  "signals": {
+    "BTC/USDT:USDT": {
+      "long_liq_usd": 48000000,
+      "short_liq_usd": 800000,
+      "signal": "CASCADE_SHORT",
+      "long_baseline": 4200000,
+      "short_baseline": 900000,
+      "oi_contracts": 61200.0,
+      "oi_change_pct_1m": -1.83
+    }
+  }
+}
+```
+
+**Retrospective validation (to run once 20+ LiqCascade trades accumulated):**
+1. Extract all snapshots where `signal != "NONE"` from `signal_history.jsonl`
+2. Match to trade outcomes in `tradesv3.dryrun.sqlite` by timestamp + pair
+3. Compare: winners vs losers — is `oi_change_pct_1m` systematically more negative for winning trades (genuine cascades) than for losing trades (false positives)?
+4. If yes: calibrate an `oi_change_pct_1m` threshold that removes losers without removing winners
+5. Also check LOB OFI from `sidecar/data/lob_raw/` if LOB sidecar is deployed by that point
+
+**Critical caveat:** LOB OFI signal was validated at 3–15s horizon. LiqCascade holds for 15–35 minutes. Using LOB OFI state at entry as a 15–35 minute outcome predictor is an untested hypothesis — it requires the retrospective validation above before implementing as a hard gate.
+
+**Implementation (deferred — pending validation):**
+If retrospective analysis confirms filter utility:
+1. Add `oi_change_pct_1m` threshold check to `_get_cascade_signal()` or `populate_entry_trend()`
+2. Threshold calibrated from retrospective data — do not guess
+3. No strategy version bump until filter is confirmed and threshold is set
+
+**Go/No-Go for Phase 4:**
+- 20+ trades accumulated in dry-run DB
+- Retrospective OI analysis shows statistically meaningful separation between winners and losers
+- Filter removes at least 20% of losing entries without removing more than 10% of winning entries
+
+**Results (to be filled in):**
+> *[Awaiting 20+ dry-run trades for retrospective analysis]*
 
 ---
 
