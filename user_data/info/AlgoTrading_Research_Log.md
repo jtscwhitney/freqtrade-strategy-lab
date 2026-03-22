@@ -35,6 +35,28 @@
 - `user_data/info/LOB_Microstructure_Dev_Plan.md` — Candidate A development plan (superseded)
 - `user_data/info/LOB_Microstructure_Deep_Dive.md` — Candidate A deep dive (ARCHIVED)
 
+**Research & Development Workflow:**
+
+This project follows a two-track workflow, split by platform:
+
+*Track 1 — Research (claude.ai web sessions):*
+1. **Sourcing Sweeps:** Claude searches primary and applied sources (Section 5) using rotating search terms. Results are triaged, promising approaches are promoted to Candidates in Section 4.3. Each sweep is logged in Section 8 with sources checked, terms used, and papers reviewed.
+2. **Candidate Evaluation:** Each candidate is scored against the 7-point Evaluation Filter (Section 6). During evaluation, Claude checks the Techniques Library (Section 7) for enhancements and Lessons (Section 9) for relevant failure modes. Results are recorded in the candidate entry.
+3. **Priority Ranking:** After evaluation, Section 4.4 is updated to reflect the recommended build order with rationale.
+4. **Dev Plan Creation:** For the top-ranked candidate, Claude creates a development plan document (similar to `CrossSectionalMomentum_Dev_Plan.md`) that a Cursor session can execute from without needing this conversation's history.
+
+*Track 2 — Implementation (Cursor sessions):*
+1. Claude reads this Research Log for context, then reads the relevant Dev Plan for implementation details.
+2. Implementation follows the Dev Plan's phase structure with explicit go/no-go gates.
+3. **Fee economics sweep (Technique 7.3) is mandatory** before building execution infrastructure — run it in Phase 0 or Phase 1, not after.
+4. When a candidate fails, write a full post-mortem in the Archived section (4.1), extract reusable infrastructure, add new lessons to Section 9, and update the Priority Ranking.
+5. When a candidate succeeds, promote it to Active (Section 4.2) and create/update a Deep Dive document.
+
+*Syncing between tracks:*
+- At the end of any session (web or Cursor), Claude produces an updated Research Log for the developer to download.
+- At the start of any session, the developer uploads the latest version of this file.
+- The developer may also have a co-developer working in parallel on specific candidates. Their results will be merged into this master log when available. Check candidate entries for parallel development notes before starting duplicate work.
+
 ---
 
 ## 1. Roles
