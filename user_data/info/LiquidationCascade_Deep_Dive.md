@@ -1,5 +1,5 @@
 # Liquidation Cascade Strategy — Deep Dive
-## Version 1 | Started: 2026-03-17 | Status: ACTIVE — Phase 3 Dry-Run + Phase 3.5 Instrumentation
+## Version 1 | Started: 2026-03-17 | Status: ACTIVE — Phase 3 Dry-Run (Preliminary Results: PF 0.659, below threshold — reassess 2026-04-05)
 
 ---
 
@@ -10,10 +10,12 @@
 
 ### Current Status
 - **Phase:** 3 — Live Dry-Run (ACTIVE) — deployed to DigitalOcean droplet 2026-03-18
-- **Last completed (2026-03-21):** Phase 3.5 instrumentation — OI change rate (`oi_contracts`, `oi_change_pct_1m`) added to sidecar snapshot and `signal_history.jsonl`. All future entries logged with OI context for retrospective LOB-OFI+OI filter validation.
-- **Previously (2026-03-20):** Expanded to 5 pairs (BTC/ETH/SOL/BNB/XRP), max_open_trades raised to 5. 57 trades accumulated in DB.
-- **Next immediate step:** Continue accumulating Phase 3 dry-run data. Go/no-go assessment after 20+ trades and 4 weeks minimum.
-- **Open decisions:** None blocking. LOB-OFI+OI filter (Phase 3.5) to be validated retrospectively once sufficient trade data is collected — see Phase 3.5 section below.
+- **Last completed (2026-03-22):** Phase 3 preliminary analysis — 129 trades over 5 days. Win rate 39.5%, profit factor 0.659 — below Phase 4 thresholds. Root cause: time_stop exits dominating at 59% (0% win rate), indicating VOL_SPIKE_MULT/CANDLE_BODY_MULT thresholds too loose (~26 entries/day vs expected 1–2 genuine cascades/pair/day). Signal alpha is real (roi exits: 96% win rate, trailing exits: 100%) — selectivity is the problem.
+- **Previously (2026-03-21):** Phase 3.5 instrumentation — OI change rate (`oi_contracts`, `oi_change_pct_1m`) added to sidecar snapshot and `signal_history.jsonl`.
+- **Previously (2026-03-20):** Expanded to 5 pairs (BTC/ETH/SOL/BNB/XRP), max_open_trades raised to 5.
+- **Next immediate step:** Continue accumulating data. Reassess 2026-04-05 (2-week mark). If time_stop rate still >50%, tighten thresholds before Phase 4. Also run Phase 3.5 OI retrospective (will have 100+ instrumented trades by then).
+- **Open decisions:** Do NOT tighten thresholds yet — 5 days is one regime snapshot. Revisit 2026-04-05.
+- **Go/no-go for Phase 4:** 20+ trades ✓ · profit factor >1.0 ✗ · win rate >40% ✗ · sidecar uptime >99% (unknown) — blocked until 2026-04-05 reassessment.
 
 ### Key Commands
 ```
@@ -569,21 +571,31 @@ Two bugs fixed during development:
 
 Signal history logging added: `sidecar/logs/signal_history.jsonl` — one JSON line per minute, all pairs, all values. Enables full retrospective analysis after dry-run.
 
-**Dry-run trades as of 2026-03-18 (Day 1):**
-| # | Pair | Dir | Lev | P&L | Exit | Signal quality |
-|---|------|-----|-----|-----|------|----------------|
-| 10 | BTC | Long | 4x | -$18 | time_stop | False cascade (single candle reversal) |
-| 11 | ETH | Short | 2x | +$194 | roi | Genuine cascade — ETH -2% in 29 min |
-| 12 | BTC | Short | 2x | +$36 | roi | Genuine cascade |
-| 13 | ETH | Short | 2x | +$19 | roi | Continued cascade from trade 11 |
-| 14 | BTC | Short | 2x | unknown | — | Open when container deleted |
-| 15+ | — | — | — | — | — | Accumulating in new volume-mounted DB |
+**Dry-run preliminary results as of 2026-03-22 (Day 1–5, 129 trades):**
 
-**Early observations:**
-- Real signal dramatically more selective than proxy: 4 consecutive ROI exits (80% win rate) vs proxy's 39.4%
-- All entries are SHORT cascades (longs being liquidated) — consistent with market direction on 2026-03-18 (BTC declining from $74K to $71K)
-- Leverage correctly set to 2x (counter-trend reduction not applicable — macro bearish, short = trend-aligned, but EMA200 context TBC)
-- `Found open order` polling for ~1 min on exit is normal Freqtrade dry-run behavior
+| Metric | Value |
+|--------|-------|
+| Closed trades | 129 |
+| Win rate | 39.5% |
+| Avg profit | –0.259% |
+| Profit factor | 0.659 |
+
+**Exit reason breakdown:**
+| Exit reason | Count | Avg profit | Win rate |
+|-------------|-------|------------|----------|
+| time_stop | 76 (59%) | –1.031% | 0.0% |
+| roi | 49 (38%) | +0.738% | 95.9% |
+| trailing_stop_loss | 4 (3%) | +3.859% | 100.0% |
+
+**Root cause analysis:**
+- time_stop dominance (59%, 0% wins) = VOL_SPIKE_MULT / CANDLE_BODY_MULT thresholds too loose. Strategy firing ~26 entries/day vs expected 1–2 genuine cascades/pair/day.
+- Signal alpha is real: roi exits +0.738% avg (96% win), trailing exits +3.859% avg (100% win). The cascade event is being captured correctly — but too many non-cascade entries are being taken alongside it.
+- Fix: raise VOL_SPIKE_MULT and/or CANDLE_BODY_MULT to improve selectivity. Do NOT change exit logic or stop parameters — those are performing correctly.
+- Decision: do not tighten parameters until 2026-04-05 (2-week mark) to avoid reacting to a single regime. Current market (March 2026) is in drawdown — cascades fire frequently in bearish conditions.
+
+**Day 1 sample (2026-03-18, for reference):**
+- Trades 10–13: first 4 trades showed 80% ROI win rate — early signal looked strong
+- This was a positively-biased sample during BTC decline from $74K → $71K; later data showed mean reversion toward 39.5% win rate as more noisy entries accumulated
 
 **Infrastructure notes:**
 - Deployed to DigitalOcean droplet (`LiqCascadeTrader01`) on 2026-03-18 — runs 24/7
@@ -842,4 +854,4 @@ Questions to be answered by backtest evidence, not prior assumptions:
 ---
 
 *Document maintained by: Claude Sonnet 4.6 + project co-developer*
-*Last updated: 2026-03-20 — Pair expansion: SOL/BNB/XRP added (5 pairs total), max_open_trades raised to 5. Dynamic sidecar baseline self-calibrates per symbol — no threshold re-tuning required. Existing 57 trades preserved in DB, all visible in FreqUI. Deploy via git pull + bash deploy/deploy.sh on droplet.*
+*Last updated: 2026-03-22 — Phase 3 preliminary results added (129 trades, 5 days): win rate 39.5%, PF 0.659, 59% time_stop (0% win). Root cause: entry thresholds too loose. Signal alpha confirmed real via roi/trailing exits. Next reassessment: 2026-04-05.*

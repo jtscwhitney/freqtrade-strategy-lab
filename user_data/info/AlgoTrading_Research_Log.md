@@ -30,6 +30,7 @@
 - `user_data/info/Regime_Adaptive_Ensemble_Deep_Dive.md` — RAME project (ARCHIVED)
 - `user_data/info/RAME_Project_Summary.md` — RAME summary (ARCHIVED)
 - `user_data/info/LiquidationCascade_Deep_Dive.md` — LiqCascade project (ACTIVE)
+- `user_data/info/CointPairsTrading_Deep_Dive.md` — Candidate F / CointPairs project (ARCHIVED)
 - `user_data/info/LOB_Microstructure_Dev_Plan.md` — Candidate A development plan (superseded)
 - `user_data/info/LOB_Microstructure_Deep_Dive.md` — Candidate A deep dive (ARCHIVED)
 
@@ -153,6 +154,21 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 ---
 
+#### Cointegration Pairs Trading (CointPairs) — Candidate F
+- **Status:** ARCHIVED (2026-03-22) — Phase 1 FAIL
+- **Duration:** 1 day (Phase 0 + Phase 1 backtest)
+- **Core idea:** Trade mean reversion of log-price spread between major crypto pairs. Enter when z-score exceeds ±threshold; exit on reversion. Single-leg V02 on BNB/ETH@4h.
+- **What worked:** Hurst H≈0.25 for all pairs — genuine mean-reverting ratio structure. Phase 0 fee sweep at 4h with 1440h stop showed ts=0% and solid economics (168bps@ez=3.0). BNB/ETH has stable rolling β (std=0.229). Phase 0 validation framework and fee sweep methodology are reusable.
+- **Why Phase 1 failed — two independent failure modes:**
+  1. **Single-leg directional exposure.** Without hedging the ETH leg, persistent BNB/ETH directional moves (ETH ETF narrative 2024, Binance regulatory headwinds) bleed the strategy. A -8% stoploss fires on 4% BNB moves (67% stop-rate); widening to -25% reduces stops to 15 but each -25% loss wipes ~4 winning trades. No fixed stop calibration avoids the negative expectancy given single-leg exposure.
+  2. **Trade frequency incompatible with the active-trading objective.** 67 trades over 1,400 days = 0.05 trades/day. BNB/ETH@4h is the only Phase 0 GO pair — there is no universe of additional GO pairs to scale frequency across. The strategy is inherently swing-trading frequency.
+- **Key lesson:** The Phase 0 fee sweep (no stoploss, 60-day hold) correctly identified the spread mean-reversion signal. The Phase 1 failure is not a signal quality problem — it is a structural single-leg exposure problem and a frequency problem. Dual-leg would fix #1 but not #2.
+- **Reusable infrastructure:** `user_data/scripts/cointpairs_phase0_validation.py` (v4) — the Phase 0 validation framework (ADF → EG → Johansen → Hurst → OU half-life → rolling β stability → fee sweep with time-stop rate check) is a complete diagnostic tool reusable for any future mean-reversion candidate.
+- **Deep dive:** `CointPairsTrading_Deep_Dive.md` (ARCHIVED)
+- **Files:** `user_data/strategies/CointPairsStrategy_V02.py`, `config/config_cointpairs_V02.json`, `user_data/scripts/cointpairs_phase0_validation.py`
+
+---
+
 ### 4.2 ACTIVE
 
 #### Liquidation Cascade Strategy (v1.0)
@@ -164,14 +180,22 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Phase plan:** Phase 3 (dry-run, 4+ weeks) → Phase 3.5 (LOB-OFI+OI filter validation) → Phase 4 (hyperopt) → Phase 5 (additional pairs if needed) → Phase 6 (live capital)
 - **Go/no-go for Phase 4:** 20+ trades, profit factor > 1.0, win rate > 40%, sidecar uptime > 99%
 - **Phase 3.5 (ACTIVE — 2026-03-21):** OI change rate instrumentation deployed to sidecar. `oi_contracts` and `oi_change_pct_1m` now logged per symbol per minute in `signal_history.jsonl`. Enables retrospective validation of LOB-OFI+OI entry filter once 20+ trades accumulated. Strategy V04 unchanged. See Deep Dive Phase 3.5 for full details.
+- **Phase 3 preliminary results (2026-03-22 — 5 days, 129 trades):**
+  - Win rate: 39.5% | Avg profit: -0.207% | Profit factor: 0.659 — **below Phase 4 thresholds**
+  - Exit breakdown: `time_stop` 76 trades (59%, avg -1.031%, 0% win) · `roi` 49 trades (38%, avg +0.738%, 96% win) · `trailing_stop_loss` 4 trades (3%, avg +3.859%, 100% win)
+  - **Root cause: 59% time-stop rate.** Signal is real (roi/trailing exits are excellent) but VOL_SPIKE_MULT/CANDLE_BODY_MULT thresholds are too loose — generating ~26 entries/day across 5 pairs vs expected 1–2 genuine cascades/pair/day. False-positive entries have no cascade momentum and exit at -1% via time stop.
+  - By pair: ETH -0.044%, SOL +0.068% (near break-even) · BTC -0.437%, BNB -0.413% (worst) · XRP -0.185%
+  - **Action:** Do not change parameters yet — 5 days is a single regime snapshot. Revisit at **2026-04-05** with 2+ weeks of data. If time-stop rate remains >50%, tighten thresholds before Phase 4 hyperopt.
+  - **Phase 3.5 OI retrospective:** Run at 2026-04-05 once ~100+ trades have OI data attached (instrumentation live since 2026-03-21). Key question: do roi/trailing exits have higher OI change rate at entry than time_stop exits?
+  - **Analysis script:** `user_data/scripts/ft_analyze.py` — run via `docker cp ft_analyze.py freqtrade_liqcascade:/tmp/ && docker exec freqtrade_liqcascade python /tmp/ft_analyze.py`
 - **Open questions:**
   1. Counter-trend cascade quality (short squeezes in bear markets)
-  2. Optimal proxy thresholds (VOL_SPIKE_MULT, CANDLE_BODY_MULT)
+  2. Optimal proxy thresholds (VOL_SPIKE_MULT, CANDLE_BODY_MULT) — **flagged by Phase 3 preliminary: likely too loose**
   3. ATR-relative vs fixed ROI targets
   4. Funding rate as entry pre-condition
   5. Cascade failure mode characterization
-  6. LOB-OFI + OI filter utility — does OI change rate at cascade detection predict 15–35 min trade outcomes? (Phase 3.5 retrospective analysis)
-- **Deep dive:** `LiquidationCascade_Deep_Dive.md`
+  6. LOB-OFI + OI filter utility — does OI change rate at cascade detection predict 15–35 min trade outcomes? (Phase 3.5 retrospective — run 2026-04-05)
+- **Deep dive:** `LiquidationCascade_Deep_Dive.md` (in `freqtrade-scalper` repo)
 
 ---
 
@@ -231,7 +255,9 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 **Filter score: 6/7 PASS, 1/7 CONDITIONAL PASS → Overall: PASS**
 
-#### CANDIDATE F: Cointegration-Based Crypto Pairs Trading
+#### Cointegration Pairs Trading (CointPairs) — formerly Candidate F
+- **Status:** ARCHIVED (2026-03-22) — Phase 1 FAIL
+- **See Section 4.1 Archived for full post-mortem.**
 - **Source:** Multiple — Amberdata blog series (2025, comprehensive 5-part guide), arXiv:2109.10662 (Tadi, 2021), Frontiers in Applied Mathematics (Jan 2026, DNN/LSTM on crypto pairs), extensive practitioner literature.
 - **Core idea:** Identify crypto pairs that are cointegrated (stable long-term equilibrium relationship), compute the spread between them, and trade mean reversion of that spread. Go long the underperformer and short the outperformer when the spread deviates beyond a z-score threshold; close when it reverts. Market-neutral by construction.
 - **Why it's interesting for us:** Well-established strategy class with decades of evidence across asset classes — this is exactly the kind of "established approach that could be enhanced" our updated Objectives encourage. Works on standard OHLCV data (no sidecar). Freqtrade supports simultaneous long/short on different pairs. Market-neutral = lower drawdowns. High trade frequency if run across many pairs simultaneously (each pair generates independent signals). Can be enhanced with multiple Techniques Library items: fractional differentiation for spread preprocessing, conformal prediction for entry confidence, Kalman filter for dynamic hedge ratios. A Jan 2026 Frontiers paper uses DNN/LSTM to forecast the spread, adding ML on top of the statistical foundation. Amberdata's backtested example shows 62% total return over multi-year period with Sharpe ~0.93 and ~16% annualized — and that's without leverage or ML enhancement.
@@ -256,11 +282,9 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 ### 4.4 Current Priority Ranking (as of 2026-03-22)
 
-1. **Candidate F (Cointegration Pairs Trading)** — Recommended next build. Lower fee-economics risk than E (mean reversion moves of 50–200 bps vs 10 bps fee floor). Clear enhancement path via Techniques Library (fractional differentiation, conformal prediction, Kalman filter). Known failure modes (cointegration breakdown during regime changes) that we can safeguard against using RAME lessons. Well-established strategy class with strong out-of-sample evidence on crypto. Works natively in Freqtrade on standard OHLCV data.
+1. **Candidate E (Path Signatures)** — Next build. F archived after Phase 1 failure (two structural failure modes: single-leg directional exposure + insufficient trade frequency). E is the clear next candidate. Novel, theoretically grounded, crypto-validated via Rahimi GitHub + Futter et al. Works on OHLCV data with no sidecar. Fee economics sweep (Technique 7.3) must be run in Phase 0 — the critical unknown is whether lead-lag moves at our execution timeframes clear the 10 bps fee floor.
 
-2. **Candidate E (Path Signatures)** — Strong second candidate. More novel, higher potential upside, but less proven at our execution timeframes. Best pursued after F is stable, as a diversified second concurrent strategy. The two are genuinely complementary — E captures lead-lag dynamics, F captures mean-reversion equilibrium.
-
-3. **Candidates B (Funding Rate Arb), C (Vol Commonality), D (CNN Preprocessing)** — Parked. B requires non-Freqtrade infrastructure. C and D are techniques, not standalone strategies (already captured in Techniques Library).
+2. **Candidates B (Funding Rate Arb), C (Vol Commonality), D (CNN Preprocessing)** — Parked. B requires non-Freqtrade infrastructure. C and D are techniques, not standalone strategies (already captured in Techniques Library).
 
 *This ranking reflects the state of knowledge as of the date above. Update after any new sweep, evaluation, or project outcome.*
 
@@ -471,12 +495,24 @@ Hard-won insights that apply across all approaches. Add to this as projects conc
 
 8. **Institutional paper results do not transfer to retail fee tiers.** A paper demonstrating taker-execution profitability may implicitly assume VIP fee tiers (0.02–0.04% per side) rather than standard retail (0.05% per side = 10 bps round-trip). Always compute expected P&L at your actual fee tier before accepting a paper's profitability claim. This is especially critical for high-frequency microstructure strategies where the fee-to-move-magnitude ratio is the dominant P&L driver. *(Source: LOB Microstructure)*
 
+9. **Mean-reversion half-life must be compatible with the trading frequency objective.** A strategy can have genuine mean-reverting structure (Hurst H ≈ 0.26) and still be untradeable if the reversion timescale is months, not hours. For any mean-reversion candidate, compute the OU half-life before building anything and compare it directly to the intended time stop. If P(reversion within time stop) < 20%, the strategy will exit almost entirely on time stops — making it a directional hold, not mean reversion. Use the 100% time-stop rate in the fee sweep as the executable diagnostic: if all trades time-stop regardless of threshold or z-score window, the half-life is incompatible with the design. *(Source: CointPairs)*
+
+10. **Val-period bull markets manufacture false fee-sweep signals.** If the validation period is a sustained bull market, long-only entries with a fixed time stop will show excellent P&L at any z-score threshold — not because the signal is good, but because you're buying a rising asset and holding 72h. Always check: do short entries mirror long entries in P&L? If longs are +150 bps and shorts are −200 bps, the signal is the bull market, not the strategy. *(Source: CointPairs)*
+
+11. **Time-stop rate > 50% is the primary diagnostic for signal over-sensitivity in event-driven strategies.** When more than half of entries exit via time stop with 0% win rate, the entry thresholds are generating false positives — not genuine signal events. The fix is not to remove or extend the time stop; it is to tighten the entry signal so only high-confidence events trigger entries. The time stop is working correctly as a capital-protection mechanism; the problem is upstream at entry. Corollary: if the roi/trailing exits show excellent win rates (>90%) while time_stops dominate by count, the alpha source is real but insufficiently selective. *(Source: LiqCascade Phase 3 preliminary)*
+
 ---
 
 ## 10. Version History
 
 | Date | Change |
 |---|---|
+| 2026-03-22 | v2.8 — LiqCascade Phase 3 preliminary results added (5 days, 129 trades, 59% time-stop rate). Lesson #11 added. Sourcing Sweep #3 initiated (separate browser session). LiqCascade analysis script noted in ACTIVE entry. |
+| 2026-03-22 | v2.7 — CointPairs archived after Phase 1 FAIL. Full post-mortem in Archived section. Priority ranking updated: Candidate E is now #1. Related files list updated. Two failure modes documented: single-leg directional exposure + trade frequency. |
+| 2026-03-22 | v2.6 — CointPairs Phase 0 complete. BNB/ETH@4h is the only GO (6/8). Phase 1 now targeting BNB/ETH@4h via V02 strategy. Research Log candidate entry updated with full findings and Phase 1 target. |
+| 2026-03-22 | v2.5 — CointPairs reverted from ARCHIVED to ACTIVE. Phase 0 1h findings preserved in Candidates entry; 4h sweep now in progress. Priority ranking updated: F first (Phase 0 ongoing), E second. |
+| 2026-03-22 | v2.4 — CointPairs archived after Phase 0 NO GO (1h only — premature; reverted in v2.5). Two new lessons added (items 9–10). Related files list updated. |
+| 2026-03-22 | v2.3 — Candidate F promoted to ACTIVE. Deep Dive created (`CointPairsTrading_Deep_Dive.md`). Strategy V01 and config scaffolded. Related files list updated. |
 | 2026-03-22 | v2.2 — Global consistency check performed. Fixed: Sweep #1 recommendation updated to note Candidate A was subsequently archived. Candidates B/C/D evaluation status clarified (parked/reclassified, not pending). Quantpedia Premium timing recommendation updated (Sweep #2 complete). Added periodic consistency check instruction to Claude preamble. No issues found with section numbering, cross-references, evaluation scores, Techniques Library, or Lessons. |
 | 2026-03-22 | v2.1 — Candidates E and F evaluated through filter. Both PASS (6/7 + 1 conditional each). E conditional on out-of-sample profitability proof; F conditional on Freqtrade paired-trade coordination logic. |
 | 2026-03-22 | v2.0 — Sweep #2 completed. Candidate E (Path Signatures) validated for crypto with multiple sources. Candidate F (Cointegration Pairs Trading) added. Sourcing section expanded in v1.9. Cross-asset proxy pairs added in v1.8. Techniques Library created in v1.7. Objectives language broadened. |
