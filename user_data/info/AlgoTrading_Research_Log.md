@@ -1,6 +1,6 @@
 # AlgoTrading Research Log
 ## Maintained by: [Developer] + Claude (any model)
-## Last Updated: 2026-03-22
+## Last Updated: 2026-03-23
 ## Stack: Cursor / Freqtrade / FreqAI / Claude Opus 4.6
 
 ---
@@ -31,9 +31,14 @@
 - `user_data/info/RAME_Project_Summary.md` — RAME summary (ARCHIVED)
 - `user_data/info/LiquidationCascade_Deep_Dive.md` — LiqCascade project (ACTIVE)
 - `user_data/info/CointPairsTrading_Deep_Dive.md` — Candidate F / CointPairs project (ARCHIVED)
-- `user_data/info/CrossSectionalMomentum_Dev_Plan.md` — Candidate G development plan (NEW)
+- `user_data/info/PathSignatureLeadLag_Deep_Dive.md` — Candidate E / Path Signatures lead-lag (ARCHIVED)
+- `user_data/info/CrossSectionalMomentum_Dev_Plan.md` — Candidate G development plan
+- `user_data/info/CrossSectionalMomentum_Deep_Dive.md` — Candidate G deep dive (**PARKED** — implementation retained; see entry)
+- `user_data/info/CrossSectionalMomentum_Phase0_Summary.md` — Candidate G Phase 0 layman summary
+- `user_data/info/CrossSectionalMomentum_Phase1_Summary.md` — Candidate G Phase 1 summary (**PARKED** candidate; results retained)
 - `user_data/info/LOB_Microstructure_Dev_Plan.md` — Candidate A development plan (superseded)
 - `user_data/info/LOB_Microstructure_Deep_Dive.md` — Candidate A deep dive (ARCHIVED)
+- `deploy/digitalocean.md` — DigitalOcean deployment reference (added with Candidate E)
 
 **Research & Development Workflow:**
 
@@ -192,6 +197,21 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 ---
 
+#### Path Signatures / Lead-Lag (Candidate E)
+- **Status:** ARCHIVED (2026-03-23) — Backtest FAIL
+- **Duration:** One implementation pass + multi-range Binance futures backtests (2026-03-23)
+- **Core idea:** Level-2 path cross-terms (Chen / Lévy antisymmetry) between **leader** (BTC) and **follower** log prices as a lead–lag score; enter ETH/SOL long/short with BTC momentum confirmation (`PathSignatureLeadLag_V01`, 1h).
+- **What worked:** Native Freqtrade pattern (informative pairs, futures whitelist); **high trade count**; Docker layer with optional `iisignature`; configs that **omit** `freqai` entirely validate cleanly in Freqtrade 2026.2.
+- **Why it failed:**
+  1. **Stop losses swamped edge.** Long timerange backtest (~2022-01-06 → 2026-03-23): **profit factor ~0.89**, **~99% drawdown** on 1000 USDT dry-run wallet; **315** exits at **stop_loss** (~−12% each) versus smaller gains on **exit_signal** / **time_stop** — net expectancy negative.
+  2. **MVP is directional / unhedged** on followers; literature and Rahimi-style work often emphasize **market-neutral** or **portfolio** construction, not single-leg alt beta.
+  3. **Evaluation filter’s conditional pass resolved negatively:** out-of-sample profitability at our execution assumptions was **not** demonstrated.
+- **Forward test:** Not run (per plan: skip when backtests decisively fail).
+- **Reusable infrastructure:** `Dockerfile.freqtrade`, `config/config_pathsignatures_V01.json`, `docker-compose.pathsignatures.yml`; strategy retained as reference only.
+- **Deep dive:** `PathSignatureLeadLag_Deep_Dive.md` (ARCHIVED)
+
+---
+
 ### 4.2 ACTIVE
 
 #### Liquidation Cascade Strategy (v1.0)
@@ -231,7 +251,7 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Core idea:** Exploit the funding rate mechanism on perpetual futures by holding delta-neutral positions (long spot + short perp, or long perp on one exchange + short perp on another). Profit comes from funding payments every 4–8 hours, not price direction.
 - **Why it's interesting for us:** Structural alpha — exists because of how perpetual contracts are designed, not statistical pattern. Market-neutral by construction. High trade frequency (funding payments every 4–8h across many pairs = many "collection events" per day). Published research shows up to 115.9% over six months with losses capped at 1.92%. Average annual return estimated at ~19% in 2025. Can be automated. Scales across many pairs simultaneously.
 - **Potential concerns:** Not a pure Freqtrade strategy — requires simultaneous positions on spot + futures (or two exchanges), which Freqtrade doesn't natively support. Would need custom execution logic. Capital-intensive for meaningful returns (funding payments are tiny per cycle). Funding rates can flip direction unpredictably. Execution risk on position entry/exit (slippage can eat the spread). May not meet the "high ROI" objective — this is more of a steady income strategy than a home-run approach.
-- **Evaluation filter score:** Not scored — parked. Requires non-Freqtrade infrastructure; lower ROI potential vs E and F.
+- **Evaluation filter score:** Not scored — parked. Requires non-Freqtrade infrastructure; lower ROI potential than active candidates.
 - **Complementarity to existing:** HIGH — completely different alpha source (carry/funding vs momentum/microstructure). Could run as a parallel "income floor" strategy while LiqCascade provides upside.
 
 #### CANDIDATE C: Crypto Volatility Commonality Forecasting
@@ -251,33 +271,8 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Complementarity to existing:** MEDIUM — the preprocessing technique could be valuable as infrastructure for any future ML-based strategy.
 
 #### CANDIDATE E: Path Signatures for Lead-Lag Detection
-- **Status:** CANDIDATE — validated for crypto in Sweep #2
-- **Source:** Rough path theory literature (SSRN, arXiv); libraries: `iisignatures`, `esig`. Key references: Gyurkó et al. (2013) "Extracting information from the signature of a financial data stream" (arXiv:1307.7244); Futter et al. (2023) "Signature Trading" (arXiv:2308.15135); Rahimi (2024) GitHub: lead-lag-portfolios using Lévy-area on crypto.
-- **Core idea:** Use path signatures (from rough path theory) to summarize the "shape" of recent multi-asset price paths into a compact mathematical representation, then feed that into a simple model (even linear regression) to detect lead-lag relationships — e.g., when ETH is about to follow BTC's move based on the geometric structure of their recent paths.
-- **Why it's interesting for us:** Theoretically grounded in serious mathematics (not data-mining). Replaces dozens of hand-crafted indicators with a single principled representation. Works on standard OHLCV data — no sidecar needed, no special data source. Libraries are lightweight and CPU-friendly. Simple downstream models (linear/logistic regression) reduce overfitting risk vs deep learning. Lead-lag detection between correlated crypto pairs could generate frequent trades across multiple pairs simultaneously (addresses trade frequency objective). Different alpha source from everything else in our registry.
-- **Crypto-specific validation (found in Sweep #2):**
-  - Rahimi (GitHub: lead-lag-portfolios) directly implements Lévy-area lead-lag detection on a universe of cryptocurrencies, constructs market-neutral portfolios from leader/follower rankings, and backtests them. Full Python code available with notebooks.
-  - Futter et al. (2023) "Signature Trading" derives a closed-form mean-variance optimal trading strategy using signatures — trading strategy as a linear functional on signature terms. Bypasses explicit price prediction entirely.
-  - A May 2025 arXiv paper on "Segmented Signatures" for pair trading proposes a decomposition method that reduces computational complexity while preserving cross-asset interaction information — directly applicable to our multi-pair setup.
-  - QuantStart has a multi-part tutorial series on rough path theory and signatures applied to quantitative finance, including Python code for lead-lag and time-joined transformations.
-- **Potential concerns:** BTC-ETH lead-lag may be partially arbitraged at our execution timeframes. The "shape" features may be sensitive to the lookback window chosen. Need to run fee economics validation (Technique 7.3) early — if the lead-lag edge is small per trade, we hit the same fee problem as LOB Microstructure. A newer paper (DeltaLag, ICAIF 2025) suggests adaptive learned lags outperform static signature-based approaches — worth monitoring but adds complexity.
-- **Combination potential (→ Candidate I):** E and G (Cross-Sectional Momentum) exploit the same underlying phenomenon — information diffusion across assets at different speeds. Signatures capture the *shape* of diffusion; momentum captures the *ranking*. A combined approach could use signature-derived lead-lag scores to improve the momentum ranking (e.g., weight leaders higher, detect when lead-lag structure is strengthening/weakening). **Candidate I is reserved for this combination — contingent on independent validation of both E and G.** Do not build I until at least one of E/G is validated in our stack.
-- **Evaluation filter score:** Scored 2026-03-22 — see below
-- **Complementarity to existing:** HIGH — entirely different alpha source (cross-asset geometric patterns vs microstructure events). Could run on standard Freqtrade candles with no infrastructure changes.
-
-**CANDIDATE E — EVALUATION FILTER:**
-
-| # | Criterion | Assessment | Pass/Fail |
-|---|---|---|---|
-| 1 | **Data availability** | Standard OHLCV data only. No special data source needed. Binance API / CCXT / freqtrade download-data. This is a major advantage over Candidate A (LOB). | **PASS** |
-| 2 | **Compute fit** | `iisignature` is CPU-only, numpy-based, pip-installable. Signature computation on truncated paths (level 3–5) is fast — O(d^n) per path but d is small (2–5 dimensions) and n is small (3–5 levels). Linear regression downstream model has trivial compute. No GPU needed for training or inference. | **PASS** |
-| 3 | **Freqtrade compatibility** | Excellent. Signature features are computed from OHLCV data in `populate_indicators()`. Lead-lag scores become standard dataframe columns. Entry/exit signals generated in `populate_entry_trend()` / `populate_exit_trend()`. No sidecar needed. Multi-pair via `informative_pairs()` — load BTC data as informative when trading ETH, compute lead-lag between them. This is native Freqtrade. | **PASS** |
-| 4 | **Out-of-sample evidence** | Mixed. Rahimi's GitHub has backtested crypto portfolios using Lévy-area lead-lag. Futter et al. (2023) derive mean-variance optimal strategies with signatures. The foundational paper (Gyurkó et al., 2013) tests on FTSE 100 futures with walk-forward validation. However, no single paper shows a fully backtested, fee-inclusive, out-of-sample profitable trading strategy on crypto using signatures for short-term trading at our timeframes. The evidence is more "the features are predictive" than "here's a profitable system." | **CONDITIONAL PASS** — signal validity demonstrated, profitability at our timeframes not yet proven |
-| 5 | **Clear mechanism** | Yes. The Lévy area between two assets' price paths mathematically captures lead-lag relationships — if asset A's moves consistently precede asset B's, the signed area is nonzero. This is grounded in rough path theory (Terry Lyons, Oxford). The economic mechanism is information diffusion: some assets react to news faster than others due to liquidity differences, attention asymmetries, or market microstructure. Well-theorized and well-understood. | **PASS** |
-| 6 | **Complementarity** | HIGH. LiqCascade is event-driven momentum on single assets. This is cross-asset relational and directionally agnostic (it trades the *relationship*, not a price direction). Completely different alpha source. | **PASS** |
-| 7 | **Implementation scope** | 1 week is feasible for an MVP. Day 1: download multi-pair OHLCV data, implement lead-lag transformation and Lévy-area computation using `iisignatures`. Day 2: compute pairwise lead-lag scores across a universe of 5–10 crypto pairs, validate that scores are nonzero and time-varying. Day 3: build a simple strategy — when lead-lag score crosses threshold, enter the lagging asset in the direction of the leader's move. Day 4: backtest in Freqtrade. Day 5: fee economics threshold sweep (Technique 7.3). All on standard OHLCV data, no infrastructure to build. | **PASS** |
-
-**Filter score: 6/7 PASS, 1/7 CONDITIONAL PASS → Overall: PASS**
+- **Status:** ARCHIVED (2026-03-23) — Backtest FAIL
+- **See Section 4.1 Archived for full post-mortem.** Deep dive: `PathSignatureLeadLag_Deep_Dive.md`
 
 #### Cointegration Pairs Trading (CointPairs) — formerly Candidate F
 - **Status:** ARCHIVED (2026-03-22) — Phase 1 FAIL
@@ -305,12 +300,19 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 **Filter score: 6/7 PASS, 1/7 CONDITIONAL PASS → Overall: PASS**
 
 #### CANDIDATE G: Cross-Sectional Crypto Momentum
-- **Status:** CANDIDATE — surfaced in Sweep #3, ready for formal evaluation
+- **Status:** **PARKED (2026-03-29)** — **Empirically weak** after Phase 1 baseline backtests. **All code, configs, and docs retained** in freqtrade-strategy-lab (`XSMomentumStrategy_V01.py`, `config_xsmom.json`, `CrossSectionalMomentum_*.md`). **Not** a live-trading **GO**. **Active development paused** until a **reopen trigger** (below) is met.
+
+- **Layman's summary (Phase 1 — read this first):** We built a simple “horse race” on ~22 futures: rank coins by recent performance, **buy the leaders**, and in the main version **also bet against the laggards** (shorts), then repeat on a fixed schedule (daily or every few hours). No ML—just prices and rules. **Only the slower, daily, long+short version** was **modestly positive** over the full test window, and even that was **fragile** (gains and losses **mostly offset**, profit factor ~**1**, **large drawdowns**). The **faster (4h) version** and **long-only** versions **failed** badly in backtest. **Shorts mattered** for dollar P&amp;L in the winning configuration—dropping them hurt, contrary to a naive “winners only” story. **Year-by-year**, results were **not steady**: strong in one slice, weak in another, **sharply negative in 2024** in the test. **Bottom line:** implementation is **sound for reuse**, but the **economic case** for deploying this baseline **as-is** is **weak**—hence **PARKED**.
+
+- **Parking policy / reopen triggers:** **Do not** continue “routine” Phase 2 tuning on G without a **new lever**. **Reopen** Candidate G (resume research or open a child project) **only** when at least one of the following is true: (1) A **named add-on or tool** is available that **plausibly addresses a documented weakness** (e.g. **2024** attribution / regime breakdown, **funding**-aware simulation, **narrower universe** hypothesis, **vol-targeted** risk layer, **external** filter from Techniques Library, or a **new ranking signal** such as a **validated** signature/lead-lag design — see **Candidate I**). (2) **New data or constraints** change the test (e.g. different venue, fee tier, or mandate). **Do not** reopen for unfocused hyperopt on the same baseline alone.
+
+- **Historical note:** Phase 1 complete **2026-03-29** — see **`CrossSectionalMomentum_Phase1_Summary.md`:** **V01_1d** ~**+17%** full-sample 2022–2025 but **unstable by year** (+71% / +14% / −40% calendar slices); **4h grid** and **long-only** **NO-GO**; regime tilt **not** a net win vs control when fairly compared.
+
 - **Source:** Drogen, Hoffstein & Otte (SSRN 2023) "Cross-sectional Momentum in Cryptocurrency Markets"; Han, Kang & Ryu (SSRN 2023) "Time-Series and Cross-Sectional Momentum: Comprehensive Analysis under Realistic Assumptions"; ScienceDirect (2025) "Cryptocurrency market risk-managed momentum strategies"; Rohrbach et al. (2017) high-frequency momentum on crypto.
 - **Core idea:** Rank a universe of 10–30 crypto assets by recent returns (formation period: 1h to 30 days). Go long the top-ranked winners and short the bottom-ranked losers. Rebalance at the holding period frequency. The cross-sectional variant exploits relative performance differences across assets rather than absolute price direction.
-- **Why it's interesting for us:** Directly addresses our two biggest recent failure modes. (1) **High frequency by design:** with hourly formation periods across 20+ pairs, this generates many trades per day — the opposite of CointPairs' 0.05 trades/day problem. (2) **Per-trade moves well above fee floor:** hourly crypto momentum moves are typically 50–300+ bps, far above our 10 bps round-trip fee. Works on standard OHLCV data, no sidecar needed. Established strategy class with strong academic evidence. Multiple enhancement paths: risk-managed variants (volatility-scaling), winner-only variants (losers rebound — documented by Han et al.), combination with path signatures (Candidate E) for smarter ranking. The literature specifically finds that cross-sectional momentum works *better* for crypto than for traditional currencies (Rohrbach et al.).
+- **Why it's interesting for us:** Directly addresses our two biggest recent failure modes. (1) **High frequency by design:** with hourly formation periods across 20+ pairs, this generates many trades per day — the opposite of CointPairs' 0.05 trades/day problem. (2) **Per-trade moves well above fee floor:** hourly crypto momentum moves are typically 50–300+ bps, far above our 10 bps round-trip fee. Works on standard OHLCV data, no sidecar needed. Established strategy class with strong academic evidence. Multiple enhancement paths: risk-managed variants (volatility-scaling), winner-only variants (losers rebound — documented by Han et al.), and **future** path-signature-style ranking (**Candidate I** — *not* the archived Candidate E MVP). The literature specifically finds that cross-sectional momentum works *better* for crypto than for traditional currencies (Rohrbach et al.).
 - **Potential concerns:** Momentum crashes are documented in crypto (Grobys 2025) — can experience severe tail losses. Han et al. (2023) find that under realistic assumptions (fees, daily price fluctuations, liquidation risk), many momentum portfolios are actually liquidated and statistically significant returns become insignificant. The momentum effect is concentrated among winners — losers often rebound and inflict losses. Risk-managed variants partially address crashes but add complexity. Need to validate that the effect persists at our specific formation/holding periods on Binance Futures perpetuals.
-- **Combination potential (→ Candidate I):** G and E (Path Signatures) could be combined — signatures provide a richer feature set for ranking assets than simple past returns. Instead of ranking by raw return over the formation period, rank by a signature-derived score that captures the *shape* and *lead-lag structure* of recent price paths. **Candidate I is reserved for this combination — contingent on independent validation of both E and G.** Build G standalone first.
+- **Combination potential (→ Candidate I):** In principle, **signature-derived features** or other **add-ons** could augment ranking if they target a **specific** Phase 1 weakness. **Candidate E (Path Signatures) MVP is archived (2026-03-23)** — treat that implementation as closed. **Candidate I** remains **reserved** as one **possible** reopen path **only** with a **new** validated design — **not** tied to “G must work standalone first” (**G** is **parked**, not a blocking milestone for scoping I as a **separate** hypothesis).
 - **Evaluation filter score:** Scored 2026-03-22 — see below
 - **Complementarity to existing:** HIGH — LiqCascade is event-driven (discrete cascades), this is systematic (continuous ranking). LiqCascade trades single assets, this trades relative performance across a universe. Different alpha source, different timing, different market conditions.
 
@@ -330,6 +332,10 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 **Co-investigator note:** This is the first candidate to score a clean 7/7 — no conditional passes. The Freqtrade compatibility issue that tripped up CointPairs (criterion 3) is structurally simpler here because each trade is independent (you're just filtering which pairs to enter based on ranking, not coordinating paired legs). The fee economics concern that killed LOB (criterion 1/7 in practice) is naturally addressed because hourly crypto momentum moves are an order of magnitude above the fee floor. The trade frequency concern that killed CointPairs is addressed by design — many pairs × short holding periods = many trades. This candidate has the cleanest path from evaluation to implementation of anything we've seen.
 
+**Phase 1 empirical gate (2026-03-29):** The **7/7 filter** scores **feasibility and literature fit**, not **live profitability**. Multi-year Freqtrade backtests on the baseline grid are a **separate** hurdle: **passed** for “code + one non-absurd variant,” **failed** for “ready to trade” or “stable edge.” Both statements can be true; the **layman's summary** and **parking policy** above reflect the empirical layer.
+
+**Active development (2026-03-29):** **Paused.** G is **PARKED** — treat as **reference implementation**, not a roadmap item, until a **reopen trigger** is satisfied.
+
 #### CANDIDATE H: On-Chain / Whale Flow Signals (reclassified as Technique)
 - **Status:** RECLASSIFIED — better suited as a Technique/filter than a standalone strategy
 - **Source:** Practitioner ecosystem — Nansen, Glassnode, Whale Alert, Arkham, CryptoQuant, Santiment, Dune Analytics
@@ -338,22 +344,22 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Where it fits:** Added to Techniques Library (Section 7) as a potential macro filter — e.g., only take LiqCascade or momentum entries when whale accumulation trend score is favorable. Similar role to the CRISIS gate but using on-chain data instead of ATR.
 
 #### CANDIDATE I: Path Signature-Enhanced Cross-Sectional Momentum (RESERVED)
-- **Status:** RESERVED — contingent on independent validation of both Candidate E (Path Signatures) and Candidate G (Cross-Sectional Momentum)
+- **Status:** RESERVED — **Candidate E MVP archived (2026-03-23).** This combination is **not** tied to `PathSignatureLeadLag_V01`.
 - **Core idea:** Replace or augment the simple return-based ranking in cross-sectional momentum with signature-derived features that capture the *shape* and *lead-lag structure* of recent multi-asset price paths. Instead of ranking by "which asset had the highest return over the last N hours," rank by "which asset's path signature indicates it is currently a leader in the information diffusion process." This could improve ranking accuracy, reduce momentum crash exposure (signatures may detect when lead-lag structure is breaking down), and provide a richer signal than raw returns.
-- **Prerequisites:** At least one of E or G must be validated independently in our stack before building I. If G works standalone, E's contribution would be tested as an enhancement layer. If E works but G doesn't, I is moot (the ranking framework is G's contribution).
-- **Do not evaluate, plan, or build until prerequisites are met.**
+- **Prerequisites (updated 2026-03-29):** **Candidate G** is **implemented and PARKED** (empirically weak — see G entry). **Do not** wait for “G standalone profit” before **scoping** I. **Build or evaluate I only** when treating it as a **new hypothesis** with **OOS protocol**, and **only if** the proposal **explicitly ties** the signature (or other) layer to a **named weakness** of the parked G baseline (e.g. regime instability, crash risk). **Not** the archived E implementation.
+- **Do not evaluate, plan, or build without** the above scoping and a **reopen** decision on G or I.
 
-### 4.4 Current Priority Ranking (as of Sweep #3 — 2026-03-22)
+### 4.4 Current Priority Ranking (as of 2026-03-29)
 
-1. **Candidate G (Cross-Sectional Momentum)** — **STRONG PASS (7/7). Recommended next build.** First candidate to achieve a clean pass on all criteria. Directly addresses both failure modes that killed our last two candidates (trade frequency + fee economics). No sidecar, no paired-trade coordination, no special data. Implementation is straightforward — ranking logic in `populate_indicators()` via `DataProvider`, entry signals for top/bottom-ranked pairs. Risk-managed and winner-only variants documented in the literature for further enhancement.
+1. **Candidate G (Cross-Sectional Momentum)** — **PARKED.** Phase 1 complete; **empirically weak**; **7/7 filter** = feasibility/literature only. **Code and docs retained**; **no active build**. **Reopen** only per **G’s parking policy** (add-on addresses weakness).
 
-2. **Candidate E (Path Signatures)** — Still strong. **Parallel implementation underway by co-developer** — check for merge-pending results before starting. If E validates independently, it becomes an enhancement layer for G (→ Candidate I).
+2. **Candidate I (Signature-Enhanced Momentum)** — RESERVED. **Candidate E archived (2026-03-23)** — **do not** assume the Path Signature MVP can be layered on. **Optional** revisit **only** with a **new** design and **explicit** link to G’s documented weaknesses — not as default next step.
 
-3. **Candidate I (Signature-Enhanced Momentum)** — RESERVED. Contingent on E + G independent validation. Do not build prematurely.
-
-4. **Candidates B (Funding Rate Arb), C (Vol Commonality), D (CNN Preprocessing)** — Parked. B requires non-Freqtrade infrastructure. C and D are techniques, not standalone strategies (already captured in Techniques Library).
+3. **Candidates B (Funding Rate Arb), C (Vol Commonality), D (CNN Preprocessing)** — Parked. B requires non-Freqtrade infrastructure. C and D are techniques, not standalone strategies (already captured in Techniques Library).
 
 *This ranking reflects the state of knowledge as of the date above. Update after any new sweep, evaluation, or project outcome.*
+
+**Removed from queue (2026-03-23):** **Candidate E (Path Signatures)** — was queued pending validation; **implementation failed backtests** (see Section 4.1). **Candidate G** was executed through Phase 1 and **parked (2026-03-29)** — see G entry; not “next to start,” **on hold**.
 
 ---
 
@@ -461,7 +467,7 @@ Before committing to implement any candidate approach, score it on these criteri
 - **Libraries:** `MAPIE` (scikit-learn compatible), `nonconformist`
 - **How we'd use it:** Layer on top of any ML-based signal (e.g., CatBoost, path signatures). Only take a trade when the prediction interval is tight and entirely on one side of the entry price. This converts a noisy point estimate into a "statistically bounded" entry filter. Could significantly reduce false entries and drawdowns.
 - **When to apply:** During Phase 2+ of any ML-based candidate — after the base model is validated but before live deployment. Adds a confidence filter without changing the underlying signal.
-- **Relevant candidates:** Any future ML-based strategy; potentially Candidate E (Path Signatures) if a regression model is used.
+- **Relevant candidates:** Any future ML-based strategy; potentially a **future** signature-based candidate if revisited after a validated design (Candidate E MVP archived 2026-03-23).
 
 ### 7.2 Feature Engineering / Preprocessing
 
@@ -472,7 +478,7 @@ Before committing to implement any candidate approach, score it on these criteri
 - **Source:** Marcos López de Prado, "Advances in Financial Machine Learning" (2018), Ch. 5. Resurgence in 2025–2026 IEEE papers on memory-augmented networks.
 - **How we'd use it:** Apply as a standard preprocessing step to any ML model that takes price data as input. Replace simple returns or percent changes with fractionally differenced series. Gives the model access to both stationarity (required for ML) and price-level memory (required for detecting support/resistance, trend structure, etc.).
 - **When to apply:** During feature engineering for any ML-based candidate. Low effort — one function call per feature column.
-- **Relevant candidates:** Candidate E (Path Signatures — could fractionally differentiate the input paths), any future FreqAI model.
+- **Relevant candidates:** Any future FreqAI model; a **future** signature-based pipeline if rebuilt (Candidate E MVP archived 2026-03-23).
 
 #### Stationarity-Preserving Preprocessing (CNN-style)
 - **Status:** RESEARCH
@@ -595,12 +601,18 @@ Hard-won insights that apply across all approaches. Add to this as projects conc
 
 11. **Time-stop rate > 50% is the primary diagnostic for signal over-sensitivity in event-driven strategies.** When more than half of entries exit via time stop with 0% win rate, the entry thresholds are generating false positives — not genuine signal events. The fix is not to remove or extend the time stop; it is to tighten the entry signal so only high-confidence events trigger entries. The time stop is working correctly as a capital-protection mechanism; the problem is upstream at entry. Corollary: if the roi/trailing exits show excellent win rates (>90%) while time_stops dominate by count, the alpha source is real but insufficiently selective. *(Source: LiqCascade Phase 3 preliminary)*
 
+12. **Lead–lag features ≠ directional edge on followers.** A mathematically meaningful cross-path score (signature / Lévy-type antisymmetry) can be **nonstationary** and still **lose money** when traded as **naked long/short** on a high-beta alt with a **wide fixed stop** — the tail risk from adverse moves dominates the distribution even when many exits are small winners. Literature often uses **market-neutral** or **portfolio** constructions; copying only the feature while ignoring the risk model duplicates the wrong object. *(Source: Candidate E / PathSignatureLeadLag_V01 backtest archive, 2026-03-23)*
+
 ---
 
 ## 10. Version History
 
 | Date | Change |
 |---|---|
+| 2026-03-29 | v3.5 — **Candidate G PARKED** (empirically weak; code/docs retained). **Parking policy** and **reopen triggers** (add-on addresses weakness). **Priority ranking §4.4** and **Candidate I prerequisites** updated. Deep Dive / Phase1 / Dev_Plan headers aligned. |
+| 2026-03-29 | v3.4 — **Candidate G:** layman's Phase 1 summary, **pursuit recommendation** (limited research / not live GO), and **Phase 1 empirical gate** note added below G's co-investigator note (7/7 ≠ trading go). |
+| 2026-03-29 | v3.3 — **Candidate G Phase 1 baseline logged** in `CrossSectionalMomentum_Phase1_Summary.md` (multi-year grid, V01_1d year splits, go/no-go). `CrossSectionalMomentum_Deep_Dive.md` v1.2 (V03/V04 safe defaults, Part 6.3 lesson). `CrossSectionalMomentum_Dev_Plan.md` Quick-Start phase updated. Candidate G status line updated. |
+| 2026-03-23 | v3.2 — **Candidate E (Path Signatures) ARCHIVED** after decisive negative backtests. Full post-mortem in Section 4.1; `PathSignatureLeadLag_Deep_Dive.md` added. Priority ranking updated (G first; I deferred; E removed). Candidate I prerequisites updated. Lesson #12 added. `deploy/digitalocean.md` added. |
 | 2026-03-22 | v3.1 — Candidate I (Signature-Enhanced Momentum) placeholder added. Combination notes added to E and G entries. CrossSectionalMomentum_Dev_Plan.md created. Related files list updated. |
 | 2026-03-22 | v3.0 — Candidate G (Cross-Sectional Momentum) evaluated: STRONG PASS 7/7 — first clean pass in project history. Priority ranking updated: G is #1 for next build. Co-investigator assessment added. |
 | 2026-03-22 | v2.9 — Sweep #3 completed. Candidate G (Cross-Sectional Momentum) added — recommended next evaluation. Candidate H (On-Chain Whale Flow) reclassified as Technique (Section 7.4). Priority ranking updated: G is #1 for evaluation, E is #2 (parallel dev in progress). Sweep #3 logged with full findings. |

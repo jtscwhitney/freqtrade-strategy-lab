@@ -1,6 +1,6 @@
 # Cross-Sectional Crypto Momentum — Development Plan
 ## Candidate G from AlgoTrading Research Log
-## Created: 2026-03-22 | Status: PRE-DEVELOPMENT
+## Created: 2026-03-22 | Status: **PARKED (2026-03-29)** — Candidate G **empirically weak** after Phase 1; plan **retained** for reference. See **`AlgoTrading_Research_Log.md`** for reopen policy.
 
 ---
 
@@ -13,17 +13,17 @@
 We are implementing a cross-sectional momentum strategy for crypto futures. The core idea: rank a universe of 10–30 crypto assets by recent returns, go long the top-ranked winners and short the bottom-ranked losers, rebalance at regular intervals. This is Candidate G in our Research Log — the first candidate to achieve a clean 7/7 PASS on our evaluation filter.
 
 ### Current Phase
-- **Phase:** 0 — Data Download + Exploration
-- **Last completed:** [Not started]
-- **Next immediate step:** Download 1h OHLCV data for 20+ Binance Futures pairs, compute formation-period returns, explore return distributions and cross-sectional dispersion
-- **Blocking issues:** None
+- **Phase:** **PARKED** — no further steps **scheduled**. Phase 1 baseline **complete**; results in **`user_data/info/CrossSectionalMomentum_Phase1_Summary.md`**.
+- **Last completed:** Phase 0 + Phase 1a + **Phase 1 full grid** (2022–2025 timerange, V01–V04).
+- **Next steps:** **None** unless **Research Log** **reopen** trigger (add-on addresses a documented weakness).
+- **Blocking issues:** None (pause is **strategic**, not technical).
 
 ### Key Context from Research Log
 - We are Co-Investigators, Co-Strategists, and Co-Developers. Claude pushes back on bad ideas. See Research Log Section 1.
 - Our objective is high-ROI, high-frequency crypto trading. See Research Log Section 2.
 - **Three previous candidates failed:** RAME (edge too small), LOB Microstructure (fee economics), CointPairs (trade frequency + single-leg exposure). See Research Log Section 4.1 and Lessons #1–11.
 - **LiqCascade is ACTIVE** in Phase 3 dry-run. This strategy would run concurrently, not replace it.
-- **Candidate E (Path Signatures)** is being implemented by a co-developer in parallel. If both E and G validate, Candidate I (combination) is reserved.
+- **Candidate E (Path Signatures)** is **archived** (2026-03-23). **Candidate G** is **PARKED** (2026-03-29). **Candidate I** (combination) remains **reserved** — see Research Log.
 - **Critical lessons that apply here:** Fee economics sweep before infrastructure (#7). Bull-market validation bias (#10). Time-stop rate as diagnostic (#11). Momentum effect is winner-concentrated — losers rebound (#academic, Han et al.).
 
 ---
@@ -110,7 +110,7 @@ The alpha comes from return continuation: assets that outperformed recently tend
 **Variants to build and compare (in order):**
 1. **V01 — Long/Short baseline:** Long top N, short bottom N, hold for holding period
 2. **V02 — Winner-only:** Long top N only, no short side (per Han et al. finding that losers rebound)
-3. **V03 — Risk-managed:** V02 + volatility-scaled position sizing (reduce exposure when recent cross-sectional volatility is high)
+3. **V03 — Regime tilt (implemented):** V01 + BTC vol/trend **stake + leverage** multipliers in `XSMomentumStrategy_V03_*` (see Deep Dive Part 6). **Not** the same as this line’s original “V02 + vol” sketch — naming in code follows **V01→V03** / **V02→V04**.
 
 ---
 
