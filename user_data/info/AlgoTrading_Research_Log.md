@@ -1,6 +1,6 @@
 # AlgoTrading Research Log
 ## Maintained by: [Developer] + Claude (any model)
-## Last Updated: 2026-03-23
+## Last Updated: 2026-03-31
 ## Stack: Cursor / Freqtrade / FreqAI / Claude Opus 4.6
 
 ---
@@ -39,6 +39,8 @@
 - `user_data/info/LOB_Microstructure_Dev_Plan.md` — Candidate A development plan (superseded)
 - `user_data/info/LOB_Microstructure_Deep_Dive.md` — Candidate A deep dive (ARCHIVED)
 - `deploy/digitalocean.md` — DigitalOcean deployment reference (added with Candidate E)
+- `user_data/info/EnsembleDonchianTrend_Dev_Plan.md` — Candidate J development plan (NEW)
+- `user_data/info/EnhancedCointPairs_Dev_Plan.md` — Candidate L development plan (NEW)
 
 **Research & Development Workflow:**
 
@@ -349,17 +351,69 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Prerequisites (updated 2026-03-29):** **Candidate G** is **implemented and PARKED** (empirically weak — see G entry). **Do not** wait for “G standalone profit” before **scoping** I. **Build or evaluate I only** when treating it as a **new hypothesis** with **OOS protocol**, and **only if** the proposal **explicitly ties** the signature (or other) layer to a **named weakness** of the parked G baseline (e.g. regime instability, crash risk). **Not** the archived E implementation.
 - **Do not evaluate, plan, or build without** the above scoping and a **reopen** decision on G or I.
 
-### 4.4 Current Priority Ranking (as of 2026-03-29)
+#### CANDIDATE J: Ensemble Donchian Trend-Following on Rotational Crypto Portfolio
+- **Status:** CANDIDATE — surfaced in Sweep #4, evaluated 2026-03-31
+- **Source:** Zarattini, Pagani & Barbon (SSRN, April 2025, revised Oct 2025) — Swiss Finance Institute. "Catching Crypto Trends: A Tactical Approach for Bitcoin and Altcoins." 38 pages. *Note: originally reviewed in Sweep #1 and dismissed as "conventional trend-following." Re-evaluated after G's parking revealed that the ensemble + rotational portfolio construction is the critical differentiator.*
+- **Core idea:** Aggregate multiple Donchian channel breakout models (lookbacks: 5, 10, 20, 30, 60, 90, 150, 250, 360 days) into a single ensemble signal. Go long when price closes above the upper channel, exit via trailing stop at the lower channel. Apply to a rotational portfolio of the top 20 most liquid coins. Volatility-based position sizing (inverse vol scaling). Long-only by design — enters long on breakouts, exits to flat when trend weakens.
+- **Why it's interesting for us:** Sharpe > 1.5 net-of-fees. CAGR 30%. Annualized alpha 10.8–14% vs BTC. Survivorship-bias-free dataset 2015–2025. Multi-pair by design = many trades. No ML, no sidecar, pure OHLCV. Transaction cost mitigation explicitly addressed. The Turtle Traders methodology adapted to crypto with genuine novelty in the ensemble aggregation. Reuses G's rotational portfolio infrastructure (`DataProvider`, `custom_info`, vol-scaling).
+- **Why it's different from G:** G ranked by *returns* and rebalanced on a schedule — regime-unstable (−40% in 2024). J ranks by *trend state* (breakout above Donchian channel) and exits on *trailing stop*, not periodic rebalance. The ensemble over 9 lookback periods smooths regime transitions. Long-only by design — no short-side losses.
+- **Potential concerns:** Paper uses daily timeframe — need to validate at 1h–4h for our frequency objective. Donchian breakout is a simple, well-known signal — alpha may decay. Holding periods can be weeks in the paper (too slow?). Shorter Donchian lookbacks on hourly data may address this but are untested in the paper.
+- **Combination potential:** Could combine with K's multi-timeframe confirmation (daily Donchian ensemble as macro filter, hourly for entry timing). Could use G's ranking infrastructure as a universe filter (only apply Donchian to top-ranked pairs).
+- **Evaluation filter score:** Scored 2026-03-31 — see below
+- **Complementarity to existing:** HIGH — LiqCascade is event-driven (discrete cascades), J is systematic trend-following (continuous breakout detection). Different signal source, different entry timing. LiqCascade fires during volatility spikes; trend-following captures sustained directional moves.
 
-1. **Candidate G (Cross-Sectional Momentum)** — **PARKED.** Phase 1 complete; **empirically weak**; **7/7 filter** = feasibility/literature only. **Code and docs retained**; **no active build**. **Reopen** only per **G’s parking policy** (add-on addresses weakness).
+**CANDIDATE J — EVALUATION FILTER:**
 
-2. **Candidate I (Signature-Enhanced Momentum)** — RESERVED. **Candidate E archived (2026-03-23)** — **do not** assume the Path Signature MVP can be layered on. **Optional** revisit **only** with a **new** design and **explicit** link to G’s documented weaknesses — not as default next step.
+| # | Criterion | Assessment | Pass/Fail |
+|---|---|---|---|
+| 1 | **Data availability** | Standard OHLCV data only. Donchian channels computed from high/low prices across 20 pairs. All available via Binance API / CCXT / freqtrade download-data. No special data source needed. | **PASS** |
+| 2 | **Compute fit** | Trivial compute. Donchian channels are rolling max/min — basic pandas/TA-Lib. Ensemble signal is averaging 9 binary breakout signals. Volatility scaling is rolling std. Even with 20 pairs × 9 lookbacks, runs in milliseconds. No GPU needed. | **PASS** |
+| 3 | **Freqtrade compatibility** | Excellent. Donchian channels are TA-Lib standard indicators (`ta.MAX`, `ta.MIN`). Ensemble signal is averaging columns. Rotational portfolio uses the same `DataProvider` + `custom_info` pattern already built and tested for G. Trailing stop exit is native to Freqtrade (`custom_stoploss()`). Each trade is independent — no paired-leg coordination. Reuses most of G's architecture. | **PASS** |
+| 4 | **Out-of-sample evidence** | Strong. Zarattini et al. (SSRN 2025, Swiss Finance Institute): Sharpe > 1.5, CAGR 30%, alpha 10.8–14% vs BTC on survivorship-bias-free data 2015–2025. Walk-forward tested. Transaction costs explicitly modeled. The underlying Donchian breakout methodology has decades of evidence across traditional asset classes (Turtle Traders, managed futures industry). Beluská & Vojtko (SSRN 2024) confirm trend-following works in BTC through Aug 2024. Mesíček & Vojtko (SSRN Nov 2025) confirm multi-timeframe trend-following on BTC 2018–2025. Multiple independent teams, different periods, different methodologies. | **PASS** |
+| 5 | **Clear mechanism** | Yes. Trend-following exploits serial correlation in returns — documented across all asset classes for 40+ years. In crypto specifically: retail-dominated participation, narrative-driven capital flows, and reflexive feedback loops (leverage liquidations amplify trends) create stronger serial correlation than in traditional markets. The Donchian ensemble is mechanistically clear: it detects when price is making new highs/lows relative to multiple historical windows simultaneously, which is a structural definition of a trend. | **PASS** |
+| 6 | **Complementarity** | HIGH. LiqCascade is event-driven momentum on single assets during volatility spikes. J is systematic trend-following across a portfolio during sustained directional moves. Different signal source (breakout vs liquidation cascade), different market conditions (trending vs volatile), different entry timing (continuous vs discrete events). Also complements the *parked* G — G used return ranking (relative performance), J uses breakout state (absolute trend). | **PASS** |
+| 7 | **Implementation scope** | 1 week is feasible for an MVP. Day 1: download 1h OHLCV for 20+ pairs, compute Donchian channels at 9 lookback periods (converted to hourly equivalents), build ensemble signal. Day 2: fee-inclusive parameter sweep across lookback grids and holding periods — Phase 0 validation before writing Freqtrade code (per Lesson #7). Day 3: implement strategy in Freqtrade reusing G's `DataProvider`/`custom_info` architecture. Day 4: backtest with regime splits (2022 bear, 2023 range, 2024–2025 bull). Day 5: volatility-scaled sizing + out-of-sample validation. All on standard OHLCV data, significant infrastructure reuse from G. | **PASS** |
 
-3. **Candidates B (Funding Rate Arb), C (Vol Commonality), D (CNN Preprocessing)** — Parked. B requires non-Freqtrade infrastructure. C and D are techniques, not standalone strategies (already captured in Techniques Library).
+**Filter score: 7/7 PASS → Overall: STRONG PASS**
+
+**Co-investigator note:** This is the second candidate to score a clean 7/7. The key differentiator from G is the *signal source*: breakout detection (binary: is price above/below the channel?) is mechanistically different from return ranking (continuous: which asset had the highest return?). Breakout signals are inherently robust to the regime instability that killed G — a trend breakout doesn't care whether you're in a bull or bear market, it just detects when a new trend is starting. The ensemble over 9 lookback periods adds further robustness. The paper was dismissed in Sweep #1 as "conventional" — but after seeing G's regime instability firsthand, the ensemble's regime-smoothing property is exactly what we need. Sometimes the established approach *is* the right one, with the right enhancements.
+
+**Important context:** The paper uses *daily* data. Our frequency objective requires validating at *hourly* timeframes. Phase 0 must include an explicit hourly-equivalent test before committing to implementation. If the signal degrades at hourly resolution, consider 4h as a compromise timeframe — still much higher frequency than daily but potentially preserving the trend signal quality. This is the primary risk to evaluate.
+
+#### CANDIDATE K: Multi-Timeframe Trend Confirmation (MACD Daily-Hourly)
+- **Status:** CANDIDATE — surfaced in Sweep #4, not formally evaluated (recommended as enhancement/filter, not standalone)
+- **Source:** Mesíček & Vojtko (Quantpedia/SSRN, Nov 2025) — "How to Design a Simple Multi-Timeframe Trend Strategy on Bitcoin." Beluská & Vojtko (SSRN Oct 2024) — "Revisiting Trend-following and Mean-Reversion Strategies in Bitcoin."
+- **Core idea:** Use daily MACD as macro trend filter, hourly MACD for entry timing. Only enter when both timeframes agree. Exit via trailing stop. Progressive enhancement: naive → confirmed → trailing exit.
+- **Why it's interesting for us:** Directly addresses Lesson #4 (short-term indicators lie in macro trends). The multi-timeframe architecture is essentially a built-in macro filter. Hourly = higher frequency. No ML, no sidecar.
+- **Potential concerns:** Single asset (BTC) in the paper. MACD is extremely well-known — edge may be arbitraged. Lower standalone frequency than multi-pair approaches.
+- **Best use:** As a **filter/enhancement** for J (daily trend confirmation before hourly Donchian entry) or for LiqCascade (only take cascade entries when macro trend confirms direction). Not recommended as standalone given single-asset scope.
+- **Evaluation filter score:** Not formally scored — recommended as technique/filter rather than standalone strategy. If applied as a filter to J, it adds no data cost, no compute cost, and addresses Lesson #4 directly.
+
+#### CANDIDATE L: Enhanced Cointegration Pairs Trading with Adaptive Trailing Stop + Volatility Filter
+- **Status:** CANDIDATE — surfaced in Sweep #4, not formally evaluated (held as second-priority)
+- **Source:** Palazzi (Journal of Futures Markets, Aug 2025, peer-reviewed) — "Trading Games: Beating Passive Strategies in the Bullish Crypto Market." Tadi & Witzany (Financial Innovation, 2025) — copula-based pairs on Binance Futures. IEEE Xplore (2020) — "Pairs Trading in Cryptocurrency Markets" (5-min frequency finding).
+- **Core idea:** Cointegrated pairs trading on 10 major cryptos, enhanced with: (1) dynamic trailing stop-loss adapting to spread's rolling volatility, (2) volatility filter suppressing entries during high-vol regimes, (3) systematic grid-search optimization of lookback period, (4) walk-forward validation.
+- **Why it's interesting for us:** Directly addresses both failure modes that killed our CointPairs (Candidate F): single-leg exposure (this is dual-leg) and trade frequency (IEEE paper shows 5-min frequency returns 11.61% monthly vs −0.07% for daily). Palazzi paper maintains positive performance across both bull and bear regimes. Our Phase 0 validation infrastructure (`cointpairs_phase0_validation.py`) is directly reusable.
+- **Potential concerns:** Requires dual-leg coordination in Freqtrade (same conditional pass as F criterion 3). Capital-intensive (two legs per trade). Palazzi paper uses daily data — need to validate at shorter timeframes. 5-min execution via Freqtrade standard execution may introduce slippage.
+- **Evaluation filter score:** Not formally scored — held as second-priority behind J. Would likely score 6/7 with conditional pass on Freqtrade compatibility (same as F). Pursue only if J doesn't work out or as a concurrent diversification strategy later.
+
+### 4.4 Current Priority Ranking (as of 2026-03-31)
+
+1. **Candidate J (Ensemble Donchian Trend-Following)** — **STRONG PASS (7/7). Recommended next build.** Second candidate to achieve a clean 7/7. Directly addresses G's primary weakness (regime instability) via ensemble smoothing. Maximum infrastructure reuse from G. Long-only by design. Dev plan created (`EnsembleDonchianTrend_Dev_Plan.md`). **Primary risk:** paper uses daily data; must validate at hourly timeframes in Phase 0.
+
+2. **Candidate G (Cross-Sectional Momentum)** — **PARKED.** Phase 1 complete; empirically weak. Code and docs retained. Reopen only per G's parking policy. *Note: J's rotational portfolio infrastructure reuses G's codebase.*
+
+3. **Candidate L (Enhanced CointPairs)** — Second-priority. Addresses both F failure modes (single-leg, frequency). Peer-reviewed (J. Futures Markets 2025). Pursue if J fails or as concurrent diversification later.
+
+4. **Candidate K (Multi-Timeframe Trend)** — Best suited as filter/enhancement for J or LiqCascade, not standalone. Apply during J's Phase 2 if base signal validates.
+
+5. **Candidate I (Signature-Enhanced Momentum)** — RESERVED. Prerequisites unchanged from 2026-03-29.
+
+6. **Candidates B (Funding Rate Arb), C (Vol Commonality), D (CNN Preprocessing)** — Parked. Unchanged.
 
 *This ranking reflects the state of knowledge as of the date above. Update after any new sweep, evaluation, or project outcome.*
 
-**Removed from queue (2026-03-23):** **Candidate E (Path Signatures)** — was queued pending validation; **implementation failed backtests** (see Section 4.1). **Candidate G** was executed through Phase 1 and **parked (2026-03-29)** — see G entry; not “next to start,” **on hold**.
+**Queue history:** E archived (2026-03-23, backtest fail). G parked (2026-03-29, empirically weak). J promoted to #1 (2026-03-31, Sweep #4).
 
 ---
 
@@ -536,7 +590,7 @@ Before committing to implement any candidate approach, score it on these criteri
 - **Candidates surfaced:** 4 (A through D, see Section 4.3)
 - **Top recommendation from Claude:** Candidate A (Order Book Microstructure) — *Note: subsequently built, tested, and archived (see Section 4.1). Signal was real but fee structure incompatible at retail rates.*
 - **Notable papers reviewed but not promoted:**
-  - *Catching Crypto Trends* (Zarattini et al., SSRN 2025) — Donchian channel ensemble on crypto. Solid but conventional trend-following; unlikely to significantly outperform simpler momentum approaches we could build ourselves.
+  - *Catching Crypto Trends* (Zarattini et al., SSRN 2025) — Donchian channel ensemble on crypto. Solid but conventional trend-following; unlikely to significantly outperform simpler momentum approaches we could build ourselves. ***Re-evaluated in Sweep #4 after G's parking revealed ensemble + rotational portfolio construction is the critical differentiator. Promoted to Candidate J.***
   - *Risk-Aware Deep RL for Crypto Trading* (Bandarupalli, SSRN 2025) — PPO-based RL. Underperformed buy-and-hold (Sharpe 1.23 vs 1.46). RL for trading remains promising in theory but this specific paper is a cautionary example.
   - *CGA-Agent: Genetic Algorithm for Crypto Trading* (arXiv 2025) — Multi-agent genetic algo for parameter optimization. Interesting meta-approach to tuning, but the underlying strategies being optimized are standard TA. Could revisit as an optimization technique rather than a strategy.
   - *BTC Seasonality / 2-hour hold strategy* (Quantpedia/SSRN) — Holding BTC only 2 hours per day based on NYSE open/close timing. Intriguing anomaly but very low frequency, fragile edge, and unclear if it persists post-ETF era.
@@ -572,6 +626,26 @@ Before committing to implement any candidate approach, score it on these criteri
   - *CTBench* (arXiv Aug 2025) — Crypto time series generation benchmark. Tests cross-sectional momentum as one of its strategy benchmarks using XGBoost on Alpha101 factors. Useful as a methodology reference but not a strategy itself.
   - *Volatility-Adaptive Trend-Following in Crypto* (SSRN Nov 2025, Karassavidis et al.) — Abstract only accessible but the title is directly relevant. Filed for full review if it becomes available.
   - *Whale volatility forecasting from Twitter* (arXiv 2022) — Uses whale-alert Twitter data + CryptoQuant on-chain data with Synthesizer Transformer to forecast BTC volatility spikes. Interesting but requires Twitter/X API access and NLP pipeline. Filed as potential enhancement to LiqCascade (whale flows could predict cascade events).
+
+
+### Sweep #4
+- **Date:** 2026-03-31
+- **Focus:** Established strategy classes with modern enhancements, biased toward high trade frequency (shorter timeframes or multi-pair execution). Motivated by G's parking (return-ranking was regime-unstable) and the need for approaches robust across market regimes.
+- **Sources checked:** SSRN (crypto trend-following, pairs trading, mean reversion — 2024–2026), arXiv (q-fin recent, Hawkes processes, microstructure), Journal of Futures Markets (Palazzi 2025), ScienceDirect, Financial Innovation (Tadi & Witzany 2025), IEEE Xplore (crypto pairs at multiple frequencies), Quantpedia/Vojtko research group, QuantifiedStrategies, practitioner sources
+- **Search terms used:** `crypto algorithmic trading strategy profitable 2025 2026 high frequency`, `SSRN crypto trading strategy multi-asset backtest`, `Donchian channel ensemble crypto trend following`, `grid trading crypto strategy automated`, `"mean reversion" OR "volatility breakout" crypto futures intraday`, `Hawkes process crypto trading order flow`, `cointegrated pairs trading crypto walk-forward adaptive`, `multi-timeframe trend strategy Bitcoin`
+- **Papers/sources reviewed:** ~40 scanned, ~15 read in detail
+- **Candidates surfaced:** 3 (J, K, L)
+  - **Candidate J: Ensemble Donchian Trend-Following** — Zarattini et al. (SSRN 2025, Swiss Finance Institute). Donchian channel ensemble (9 lookbacks) on rotational top-20 crypto portfolio. Sharpe > 1.5, CAGR 30%, alpha 10.8–14% vs BTC. Survivorship-bias-free. Long-only. Vol-scaled position sizing. *Originally reviewed in Sweep #1 and dismissed as "conventional" — re-evaluated after G showed regime instability, which the ensemble addresses.*
+  - **Candidate K: Multi-Timeframe Trend Confirmation** — Mesíček & Vojtko (Quantpedia/SSRN Nov 2025). Daily-hourly MACD confirmation + trailing stop on BTC. Improved stability and risk-adjusted returns. Recommended as filter/enhancement for J or LiqCascade, not standalone.
+  - **Candidate L: Enhanced CointPairs** — Palazzi (J. Futures Markets, Aug 2025, peer-reviewed). Adaptive trailing stop + vol filter on cointegrated crypto pairs. Positive across bull and bear regimes. Addresses both F failure modes. IEEE Xplore data shows 5-min pairs trading returns 11.61%/month vs −0.07% daily. Second-priority behind J.
+- **Top recommendation from Claude:** Candidate J is the strongest find. It directly addresses G's regime instability via ensemble smoothing, reuses G's infrastructure, and has the strongest academic backing (Swiss Finance Institute, survivorship-bias-free data, transaction costs modeled). The primary risk is the daily-to-hourly timeframe translation. Recommend promoting to formal evaluation and building a dev plan immediately.
+- **Notable sources reviewed but not promoted:**
+  - *Dynamic Grid Trading* (arXiv, Dec 2025) — Grid strategy with auto-reset on range break. Strong in ranging markets but fails in trends — opposite of crypto's character. Filed as potential ranging-regime technique only.
+  - *Beluská & Vojtko BTC trend/mean-reversion* (SSRN Oct 2024) — Updated through Aug 2024, confirms BTC trends at maxima and reverts at minima. Supports J and K but not a new strategy. Context for signal validation.
+  - *Hawkes process LOB forecasting* (arXiv 2023, multiple papers) — Theoretically elegant for modeling self-exciting order flow cascades. Requires LOB data (same constraint as Candidate A). Filed as potential future LiqCascade entry filter enhancement — the self-exciting property maps onto cascade detection.
+  - *CryptoPulse* (arXiv Feb 2025) — Already rejected in Sweep #3. Daily frequency, LLM pipeline. No change.
+  - *Probabilistic Volatility Forecasting* (arXiv Aug 2025) — Ensemble of HAR/GARCH/ML for conditional vol quantiles. Forecasting framework, not trading strategy. Filed as potential position-sizing technique, similar to Candidate C.
+  - *Copula-based crypto pairs trading* (Tadi & Witzany, Financial Innovation 2025) — Supporting evidence for Candidate L. Tested on Binance USDT-margined futures specifically. Outperforms standard cointegration and copula approaches. Integrated into L's evidence base.
 
 ---
 
@@ -609,6 +683,7 @@ Hard-won insights that apply across all approaches. Add to this as projects conc
 
 | Date | Change |
 |---|---|
+| 2026-03-31 | v3.6 — **Sweep #4 completed.** 3 new candidates: **J (Ensemble Donchian Trend-Following)** evaluated **7/7 STRONG PASS** — promoted to #1 build priority; **K (Multi-Timeframe Trend)** filed as filter/enhancement; **L (Enhanced CointPairs)** held as second-priority. Sweep #1 Zarattini note updated (re-evaluated). Priority ranking updated. Dev plans created: `EnsembleDonchianTrend_Dev_Plan.md` (J) and `EnhancedCointPairs_Dev_Plan.md` (L). Related files updated. |
 | 2026-03-29 | v3.5 — **Candidate G PARKED** (empirically weak; code/docs retained). **Parking policy** and **reopen triggers** (add-on addresses weakness). **Priority ranking §4.4** and **Candidate I prerequisites** updated. Deep Dive / Phase1 / Dev_Plan headers aligned. |
 | 2026-03-29 | v3.4 — **Candidate G:** layman's Phase 1 summary, **pursuit recommendation** (limited research / not live GO), and **Phase 1 empirical gate** note added below G's co-investigator note (7/7 ≠ trading go). |
 | 2026-03-29 | v3.3 — **Candidate G Phase 1 baseline logged** in `CrossSectionalMomentum_Phase1_Summary.md` (multi-year grid, V01_1d year splits, go/no-go). `CrossSectionalMomentum_Deep_Dive.md` v1.2 (V03/V04 safe defaults, Part 6.3 lesson). `CrossSectionalMomentum_Dev_Plan.md` Quick-Start phase updated. Candidate G status line updated. |
