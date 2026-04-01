@@ -1,0 +1,102 @@
+{
+  "max_open_trades": 10,
+  "stake_currency": "USDT",
+  "stake_amount": "unlimited",
+  "tradable_balance_ratio": 0.9,
+  "fiat_display_currency": "USD",
+
+  "dry_run": true,
+  "dry_run_wallet": 10000,
+
+  "cancel_open_orders_on_exit": false,
+  "trading_mode": "futures",
+  "margin_mode": "isolated",
+
+  "unfilledtimeout": {
+    "entry": 10,
+    "exit": 10,
+    "exit_timeout_count": 0,
+    "unit": "minutes"
+  },
+
+  "entry_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1,
+    "price_last_balance": 0,
+    "check_depth_of_market": {"enabled": false, "bids_to_ask_delta": 1}
+  },
+
+  "exit_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
+    "pair_whitelist": [
+      "BTC/USDT:USDT",
+      "ETH/USDT:USDT",
+      "BNB/USDT:USDT",
+      "SOL/USDT:USDT",
+      "XRP/USDT:USDT",
+      "ADA/USDT:USDT",
+      "DOGE/USDT:USDT",
+      "LTC/USDT:USDT",
+      "BCH/USDT:USDT",
+      "ETC/USDT:USDT"
+    ],
+    "pair_blacklist": []
+  },
+
+  "pairlists": [{"method": "StaticPairList"}],
+
+  "freqai": {
+    "enabled": false,
+    "purge_old_models": true,
+    "train_period_days": 60,
+    "backtest_period_days": 7,
+    "identifier": "cointpairs_v2_disabled",
+    "feature_parameters": {
+      "include_timeframes": ["1h"],
+      "include_corr_pairlist": ["BTC/USDT:USDT"],
+      "label_period_candles": 16,
+      "include_shifted_candles": 2,
+      "indicator_periods_candles": [10, 20],
+      "plot_feature_importances": 0,
+      "noise_standard_deviation": 0.02,
+      "DI_threshold": 0.45
+    },
+    "data_split_parameters": {"test_size": 0.25, "shuffle": false},
+    "model_training_parameters": {
+      "n_estimators": 500,
+      "learning_rate": 0.05,
+      "max_depth": 6,
+      "tree_method": "hist",
+      "subsample": 0.8,
+      "colsample_bytree": 0.8
+    }
+  },
+
+  "bot_name": "EnhancedCointPairs_L",
+  "initial_state": "running",
+  "force_entry_enable": true,
+  "internals": {"process_throttle_secs": 5},
+
+  "api_server": {
+    "enabled": false,
+    "listen_ip_address": "0.0.0.0",
+    "listen_port": 8080,
+    "verbosity": "error",
+    "enable_openapi": false,
+    "jwt_secret_key": "change_me_cointpairs_v2_jwt",
+    "CORS_origins": [],
+    "username": "freqtrader",
+    "password": "SuperSecurePassword123"
+  }
+}

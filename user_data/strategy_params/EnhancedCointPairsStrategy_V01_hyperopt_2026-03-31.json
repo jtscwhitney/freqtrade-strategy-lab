@@ -1,0 +1,31 @@
+{
+  "strategy_name": "EnhancedCointPairsStrategy_V01",
+  "params": {
+    "roi": {
+      "0": 100
+    },
+    "stoploss": {
+      "stoploss": -0.99
+    },
+    "trailing": {
+      "trailing_stop": false,
+      "trailing_stop_positive": null,
+      "trailing_stop_positive_offset": 0.0,
+      "trailing_only_offset_is_reached": false
+    },
+    "max_open_trades": {
+      "max_open_trades": 2
+    },
+    "buy": {
+      "entry_zscore": 2.89,
+      "ols_window": 133,
+      "zscore_window": 45
+    },
+    "sell": {
+      "exit_zscore": 0.04,
+      "max_hold_candles": 318
+    }
+  },
+  "ft_stratparam_v": 1,
+  "export_time": "2026-03-31 21:34:02.973648+00:00"
+}

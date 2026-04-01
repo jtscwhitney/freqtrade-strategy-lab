@@ -1,0 +1,24 @@
+lever_id,description,pair,timerange,strategy,timeframe,exit_code,total_trades,total_profit_pct,profit_factor,sharpe,max_dd_pct,long_profit_pct,short_profit_pct
+baseline_v02_btc_eth,V02 defaults BTC/ETH 4h,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,122,27.67,1.14,0.08,17.63,5.75,21.92
+entry_z_1.65,entry_zscore=1.65,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,156,-9.12,0.96,-0.03,25.90,-24.42,15.30
+entry_z_2.0,entry_zscore=2.0,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,122,27.67,1.14,0.08,17.63,5.75,21.92
+entry_z_2.4,entry_zscore=2.4,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,82,33.5,1.24,0.08,17.51,44.39,-10.90
+exit_z_0.35,exit_zscore=0.35,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,118,18.03,1.09,0.05,18.51,-12.17,30.20
+exit_z_0.5,exit_zscore=0.5,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,122,27.67,1.14,0.08,17.63,5.75,21.92
+exit_z_0.65,exit_zscore=0.65,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,124,25.78,1.13,0.08,14.05,11.91,13.87
+zscore_w_60,zscore_window=60,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,148,7.24,1.03,0.02,21.57,-21.39,28.64
+zscore_w_84,zscore_window=84,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,122,27.67,1.14,0.08,17.63,5.75,21.92
+zscore_w_120,zscore_window=120,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,112,10.72,1.05,0.03,25.99,-28.99,39.71
+ols_w_150,ols_window=150,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,134,5.15,1.03,0.02,15.97,-27.99,33.14
+ols_w_180,ols_window=180,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,122,27.67,1.14,0.08,17.63,5.75,21.92
+ols_w_210,ols_window=210,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,130,5.38,1.03,0.02,21.61,1.30,4.09
+beta_churn_max_0.0075,beta_churn_max=0.0075,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,116,25.41,1.13,0.07,17.61,5.74,19.67
+beta_churn_max_0.0085,beta_churn_max=0.0085,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,122,27.67,1.14,0.08,17.63,5.75,21.92
+beta_churn_max_0.011,beta_churn_max=0.011,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,132,22.57,1.11,0.07,17.55,9.11,13.46
+v01_no_churn,V01 baseline (no beta churn),BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V01,4h,0,134,25.73,1.12,0.07,18.82,12.06,13.67
+v02_1h_btc_eth,V02 defaults BTC/ETH 1h,BTC/ETH,20220101-20260331,EnhancedCointPairsStrategy_V02_1h,1h,0,492,-6.13,0.99,-0.03,36.76,48.31,-54.44
+pair_BTC_SOL,V02 defaults 4h BTC/SOL,BTC/SOL,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,126,0.74,1.00,0.00,35.26,1.62,-0.88
+pair_BTC_DOGE,V02 defaults 4h BTC/DOGE,BTC/DOGE,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,132,-38.82,0.80,-0.11,59.33,5.78,-44.60
+pair_BNB_SOL,V02 defaults 4h BNB/SOL,BNB/SOL,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,138,143.13,1.47,0.24,29.52,1.67,141.46
+pair_SOL_DOGE,V02 defaults 4h SOL/DOGE,SOL/DOGE,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,136,-16.44,0.94,-0.03,55.19,36.53,-52.97
+pair_XRP_DOGE,V02 defaults 4h XRP/DOGE,XRP/DOGE,20220101-20260331,EnhancedCointPairsStrategy_V02,4h,0,108,-75.03,0.73,-0.12,83.88,48.57,-123.59

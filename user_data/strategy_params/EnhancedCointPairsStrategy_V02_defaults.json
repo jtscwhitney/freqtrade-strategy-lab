@@ -1,0 +1,32 @@
+{
+  "strategy_name": "EnhancedCointPairsStrategy_V02",
+  "params": {
+    "roi": {
+      "0": 100
+    },
+    "stoploss": {
+      "stoploss": -0.99
+    },
+    "trailing": {
+      "trailing_stop": false,
+      "trailing_stop_positive": null,
+      "trailing_stop_positive_offset": 0.0,
+      "trailing_only_offset_is_reached": false
+    },
+    "max_open_trades": {
+      "max_open_trades": 2
+    },
+    "buy": {
+      "entry_zscore": 2.0,
+      "ols_window": 180,
+      "zscore_window": 84,
+      "beta_churn_window": 12,
+      "beta_churn_max": 0.0085
+    },
+    "sell": {
+      "exit_zscore": 0.5,
+      "max_hold_candles": 360
+    }
+  },
+  "ft_stratparam_v": 1
+}

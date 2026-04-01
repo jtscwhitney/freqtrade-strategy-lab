@@ -1,22 +1,24 @@
 """
-CointPairs Phase 0 — Cointegration Validation Script (v4)
+CointPairs Phase 0 — Cointegration Validation Script (v5)
 
-Changes from v3:
-    - Sweeps TIMEFRAMES ["1h", "4h"] — tests strategy at its natural timescale.
-      All windows (OLS, z-score) and time stops defined in calendar days/hours
-      and converted to candles per timeframe.
-    - MAX_HOLD increased: 1h → 168h (7d), 4h → 1440h (60d).
-      At 4h with 60d hold, P(ETH/BTC reversion) ≈ 64% vs 5% at 1h/72h.
-    - Pair universe expanded: adds BNB/ETH and BNB/BTC.
-      Missing data files are skipped gracefully (download BNB separately if needed).
-    - Go/no-go half-life check replaced with P(reversion within MAX_HOLD) > 20%.
-      This is timeframe-agnostic and directly relevant to trading viability.
-    - Cross-pair/cross-timeframe summary table at the end.
+v4:
+    - Sweeps TIMEFRAMES ["1h", "4h"]; windows in days/hours → candles.
+    - MAX_HOLD: 1h → 168h (7d), 4h → 1440h (60d).
+    - Expanded pair list; missing files skipped gracefully.
+    - P(reversion within MAX_HOLD) > 20% go/no-go.
+    - Cross-pair summary table.
 
-Download BNB data (optional):
+v5 (Candidate L — Enhanced CointPairs):
+    - Set CANDIDATE_L = True for 10-asset universe, all 45 unique pairs.
+    - CANDIDATE_L_TIMEFRAMES: e.g. ["1h"] (primary), ["4h"] (dev-plan fallback), or both.
+    - Dual-leg fee: 20 bps round-trip (10 bps/side × 2 legs).
+    - Timerange through 2026-03-31; train/val 75/25.
+    - Z-score lookbacks: 48, 96, 168, 336, 720 hours (Palazzi-style grid).
+
+Download futures data (Candidate L):
     docker compose run --rm freqtrade download-data \\
-        --config config/config_cointpairs_V01.json \\
-        --pairs BNB/USDT:USDT --timerange 20220101-20251231 --timeframes 1h 4h
+        --config /freqtrade/config/config_cointpairs_v2.json \\
+        --timerange 20220101-20260331 --timeframes 1h 4h --userdir /freqtrade/user_data
 
 Usage:
     docker compose run --rm --entrypoint python freqtrade \\
@@ -42,17 +44,55 @@ import pandas as pd
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
+# Candidate L: full 10-asset / 45-pair pipeline. Set False for legacy v4 behaviour.
+CANDIDATE_L = True
+
+# Dev plan: primary 1h; include "4h" for fallback comparison (same script, same fee model).
+CANDIDATE_L_TIMEFRAMES = ["1h", "4h"]
+
 DATA_DIR        = Path("/freqtrade/user_data/data/binance/futures")
 TIMERANGE_START = "2022-01-01"
-TIMERANGE_END   = "2025-12-31"
-TRAIN_RATIO     = 0.67
+TIMERANGE_END   = "2026-03-31" if CANDIDATE_L else "2025-12-31"
+TRAIN_RATIO     = 0.75 if CANDIDATE_L else 0.67
 
-# Timeframes to test. All window parameters are in days/hours and converted.
-TIMEFRAMES = ["1h", "4h"]
+# Legacy v4 pair list (used when CANDIDATE_L is False)
+PAIRS_LEGACY = [
+    ("ETH/USDT:USDT", "BTC/USDT:USDT"),
+    ("SOL/USDT:USDT", "ETH/USDT:USDT"),
+    ("SOL/USDT:USDT", "BTC/USDT:USDT"),
+    ("BNB/USDT:USDT", "ETH/USDT:USDT"),
+    ("BNB/USDT:USDT", "BTC/USDT:USDT"),
+]
 
-# Windows defined in calendar days — converted to candles per timeframe
+# Candidate L: Palazzi-style 5 PoW + 5 PoS — 45 unique pairs (i < j)
+UNIVERSE_L = [
+    "BTC/USDT:USDT",
+    "ETH/USDT:USDT",
+    "BNB/USDT:USDT",
+    "SOL/USDT:USDT",
+    "XRP/USDT:USDT",
+    "ADA/USDT:USDT",
+    "DOGE/USDT:USDT",
+    "LTC/USDT:USDT",
+    "BCH/USDT:USDT",
+    "ETC/USDT:USDT",
+]
+
+PAIRS = (
+    [(UNIVERSE_L[i], UNIVERSE_L[j]) for i in range(len(UNIVERSE_L)) for j in range(i + 1, len(UNIVERSE_L))]
+    if CANDIDATE_L
+    else PAIRS_LEGACY
+)
+
+# Timeframes to test.
+TIMEFRAMES = CANDIDATE_L_TIMEFRAMES if CANDIDATE_L else ["1h", "4h"]
+
+# Windows defined in calendar days — converted to candles per timeframe (legacy)
 OLS_WINDOW_DAYS      = 30          # hedge ratio lookback
 ZSCORE_WINDOW_DAYS   = [7, 14, 30] # z-score normalisation windows
+
+# Candidate L: explicit lookback in hours → candles for 1h (48h … 720h)
+ZSCORE_WINDOW_HOURS_L = [48, 96, 168, 336, 720]
 
 # Time stop per timeframe (hours) — drives P(reversion) calculation
 MAX_HOLD_HOURS = {
@@ -60,9 +100,9 @@ MAX_HOLD_HOURS = {
     "4h": 1440,  # 60 days — aligned with ~2× ETH/BTC half-life
 }
 
-# Fee economics
-FEE_BPS_RT     = 10.0  # 5 bps/side retail round-trip
-FEE_FLOOR_MULT = 3.0   # target mean_net > 30 bps
+# Fee economics — Candidate L: dual-leg 10 bps/side × 2 = 20 bps round-trip
+FEE_BPS_RT     = 20.0 if CANDIDATE_L else 10.0
+FEE_FLOOR_MULT = 3.0   # target mean_net > FEE_BPS_RT * this (fee floor × 3)
 TIME_STOP_MAX  = 0.50  # require < 50% exits via time stop
 
 ENTRY_THRESHOLDS = [1.5, 2.0, 2.5, 3.0]
@@ -70,15 +110,6 @@ EXIT_THRESHOLDS  = [0.0, 0.3, 0.5]
 
 # Half-life go/no-go: require P(reversion within MAX_HOLD) > this
 MIN_REVERSION_PROB = 0.20
-
-# Pairs: (traded, anchor). Missing data files are skipped — no sys.exit.
-PAIRS = [
-    ("ETH/USDT:USDT", "BTC/USDT:USDT"),
-    ("SOL/USDT:USDT", "ETH/USDT:USDT"),
-    ("SOL/USDT:USDT", "BTC/USDT:USDT"),
-    ("BNB/USDT:USDT", "ETH/USDT:USDT"),
-    ("BNB/USDT:USDT", "BTC/USDT:USDT"),
-]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -206,8 +237,12 @@ def analyse(
     n     = len(traded)
     split = int(n * TRAIN_RATIO)
     ols_w = OLS_WINDOW_DAYS * 24 // candle_h
-    zs_ws = [max(10, d * 24 // candle_h) for d in ZSCORE_WINDOW_DAYS]
+    if CANDIDATE_L:
+        zs_ws = [max(10, h // candle_h) for h in ZSCORE_WINDOW_HOURS_L]
+    else:
+        zs_ws = [max(10, d * 24 // candle_h) for d in ZSCORE_WINDOW_DAYS]
     max_h_c = MAX_HOLD_HOURS[timeframe] // candle_h   # in candles
+    fee_target_bps = FEE_BPS_RT * FEE_FLOOR_MULT
 
     print(f"\n{'#'*65}")
     print(f"# {label}  |  {n:,} candles  "
@@ -279,12 +314,17 @@ def analyse(
     sweep_results = []
 
     for zw in zs_ws:
-        days_label = zw * candle_h // 24
+        if CANDIDATE_L:
+            hours_w = zw * candle_h
+            win_label = f"{hours_w:.0f}h ({hours_w / 24:.1f}d)"
+        else:
+            days_label = zw * candle_h // 24
+            win_label = f"{days_label}d"
         z_full = zscore(lsp_full, zw)
         val_z  = z_full[split:]
         vz     = val_z[~np.isnan(val_z)]
 
-        print(f"\n  ── ZSCORE_WINDOW={zw}c ({days_label}d) ──")
+        print(f"\n  ── ZSCORE_WINDOW={zw}c ({win_label}) ──")
         print(f"  z dist: mean={np.nanmean(val_z):.3f}  std={np.nanstd(val_z):.3f}  "
               f"|z|>1.5:{(np.abs(vz)>1.5).mean()*100:.1f}%  "
               f"|z|>2.0:{(np.abs(vz)>2.0).mean()*100:.1f}%")
@@ -292,16 +332,29 @@ def analyse(
         sw = fee_sweep(val_traded, val_z, FEE_BPS_RT, max_h_c)
         if sw.empty:
             print("  No trades generated.")
-            sweep_results.append({"zw_days": days_label, "status": "NO TRADES",
+            sweep_results.append({"zw_label": win_label, "status": "NO TRADES",
                                    "mean_net": np.nan, "ts_pct": np.nan, "n": 0})
             continue
 
-        target   = FEE_BPS_RT * FEE_FLOOR_MULT
+        target   = fee_target_bps
         good     = sw[(sw["mean_net"] > target) & (sw["ts_pct"] < TIME_STOP_MAX)]
         marginal = sw[sw["mean_net"] > target]
 
         pd.set_option("display.float_format", "{:.2f}".format)
         print(sw.head(6).to_string(index=False))
+
+        # Lesson #10: long vs short mean-reversion symmetry (same ez/xz)
+        for ez in ENTRY_THRESHOLDS:
+            for xz in EXIT_THRESHOLDS:
+                sub = sw[(sw["ez"] == ez) & (sw["xz"] == xz)]
+                if len(sub) == 2:
+                    row_l = sub[sub["dir"] == "long"].iloc[0]
+                    row_s = sub[sub["dir"] == "short"].iloc[0]
+                    ratio = (abs(row_l["mean_net"]) / max(abs(row_s["mean_net"]), 1e-9)
+                             if row_s["mean_net"] != 0 else np.nan)
+                    if ez == 2.0 and xz == 0.0:
+                        print(f"  Symmetry @ ez={ez} xz={xz}: long={row_l['mean_net']:.1f}bps  "
+                              f"short={row_s['mean_net']:.1f}bps  (|long|/|short|≈{ratio:.2f})")
 
         if not good.empty:
             b = good.iloc[0]
@@ -319,7 +372,7 @@ def analyse(
             print(f"  ✗ FAIL best={b['mean_net']:.0f}bps")
 
         sweep_results.append({
-            "zw_days": days_label, "status": status,
+            "zw_label": win_label, "status": status,
             "mean_net": b["mean_net"], "ts_pct": b["ts_pct"],
             "n": int(b["n"]),
         })
@@ -334,7 +387,7 @@ def analyse(
         "Hurst H < 0.5":                                   H < 0.5,
         f"P(revert in {MAX_HOLD_HOURS[timeframe]}h) ≥ {MIN_REVERSION_PROB:.0%}": hl_pass,
         "Rolling β stable (std < 0.30)":                   beta_stable,
-        "Fee sweep PASS (net>30bps, ts<50%)":
+        f"Fee sweep PASS (net>{fee_target_bps:.0f}bps, ts<50%)":
             any(r["status"] == "PASS" for r in sweep_results),
     }
     passes = sum(checks.values())
@@ -368,9 +421,15 @@ def analyse(
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    print("CointPairs Phase 0 — Multi-Pair / Multi-Timeframe Validation (v4)")
-    print(f"Timeframes: {TIMEFRAMES}  |  Pairs: "
-          f"{', '.join(f'{t.split(chr(47))[0]}/{a.split(chr(47))[0]}' for t,a in PAIRS)}")
+    ver = "v5 (Candidate L)" if CANDIDATE_L else "v4"
+    print(f"CointPairs Phase 0 — Multi-Pair / Multi-Timeframe Validation ({ver})")
+    if CANDIDATE_L:
+        print(f"  Mode: Candidate L — {len(PAIRS)} pairs, {FEE_BPS_RT:.0f} bps RT dual-leg, "
+              f"{TIMERANGE_START}–{TIMERANGE_END}, train/val={TRAIN_RATIO:.0%}/{1-TRAIN_RATIO:.0%}")
+    pair_preview = ", ".join(f'{t.split(chr(47))[0]}/{a.split(chr(47))[0]}' for t, a in PAIRS[:8])
+    if len(PAIRS) > 8:
+        pair_preview += f", … (+{len(PAIRS) - 8} more)"
+    print(f"Timeframes: {TIMEFRAMES}  |  Pairs ({len(PAIRS)}): {pair_preview}")
 
     # Load all unique (symbol, timeframe) combos upfront
     symbols = {s for pair in PAIRS for s in pair}
@@ -426,14 +485,25 @@ def main() -> None:
             "beta_std", "sweep", "passes", "overall"]
     print(df[cols].to_string(index=False))
 
+    results_dir = Path(__file__).resolve().parent.parent / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = results_dir / "cointpairs_phase0_summary.csv"
+    df.to_csv(csv_path, index=False)
+    print(f"\n  Summary CSV: {csv_path}")
+
     passed = df[df["overall"] == "GO"]
     marginal = df[df["overall"] == "MARGINAL"]
 
     print()
     if not passed.empty:
-        best = passed.sort_values("passes", ascending=False).iloc[0]
-        print(f"  ✓ GO candidate: {best['label']}  ({best['passes']}/8)")
-        print(f"    Recommend Phase 1 backtest with this pair/timeframe.")
+        for tf in sorted(df["tf"].unique()):
+            sub = passed[passed["tf"] == tf]
+            if sub.empty:
+                continue
+            best = sub.sort_values("passes", ascending=False).iloc[0]
+            print(f"  ✓ GO @ {tf}: {best['label']}  ({best['passes']}/8)")
+        best_any = passed.sort_values("passes", ascending=False).iloc[0]
+        print(f"  → Top overall: {best_any['label']}  ({best_any['passes']}/8) — Phase 1 backtest starting point.")
     elif not marginal.empty:
         best = marginal.sort_values("passes", ascending=False).iloc[0]
         print(f"  ~ Best MARGINAL: {best['label']}  ({best['passes']}/8)")

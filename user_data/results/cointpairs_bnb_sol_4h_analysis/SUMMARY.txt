@@ -1,0 +1,9 @@
+BNB/SOL @ 4h — backtest summary (2026-04-01 rerun, matches prior +143% run)
+
+Timerange: 20220101-20260331 (effective backtest ~2022-03-25 after startup candles)
+Total profit %: 143.13%  |  PF: 1.47  |  Sharpe: 0.24  |  Max DD: 29.52%
+Leg-trades: 138 (69 BNB + 69 SOL)  |  ~69 pair sessions
+
+Key files:
+- backtest-result-2026-04-01_11-49-21.zip — Freqtrade export (trades + metadata)
+- strategy_params_snapshot.json / config_snapshot.json — exact repro inputs

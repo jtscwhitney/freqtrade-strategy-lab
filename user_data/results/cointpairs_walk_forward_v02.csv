@@ -1,0 +1,6 @@
+window,timerange,strategy,param_set,exit_code,total_trades,total_profit_pct,profit_factor,sharpe,max_dd_pct,long_profit_pct,short_profit_pct
+2022,20220101-20221231,EnhancedCointPairsStrategy_V02,default,0,24,-0.47,0.99,-0.01,17.63,3.59,-4.06
+2023,20230101-20231231,EnhancedCointPairsStrategy_V02,default,0,22,3.61,1.15,0.05,11.97,6.50,-2.89
+2024,20240101-20241231,EnhancedCointPairsStrategy_V02,default,0,30,18.3,1.38,0.20,10.25,7.67,10.64
+2025-2026Q1,20250101-20260331,EnhancedCointPairsStrategy_V02,default,0,46,4.54,1.07,0.05,10.02,-9.88,14.42
+full_2022_2026,20220101-20260331,EnhancedCointPairsStrategy_V02,default,0,122,27.67,1.14,0.08,17.63,5.75,21.92

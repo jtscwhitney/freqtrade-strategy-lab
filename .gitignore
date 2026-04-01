@@ -9,6 +9,7 @@ user_data/chat_sessions/
 
 # Local configs — only template is tracked
 !config/config-template.json
+config/config_cointpairs_lever_sweep_tmp.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

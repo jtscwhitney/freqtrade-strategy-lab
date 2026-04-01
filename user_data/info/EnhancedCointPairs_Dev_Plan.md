@@ -1,6 +1,6 @@
 # Enhanced Cointegration Pairs Trading — Development Plan
 ## Candidate L from AlgoTrading Research Log
-## Created: 2026-03-31 | Status: PRE-DEVELOPMENT
+## Created: 2026-03-31 | Status: Phase 1 — IN PROGRESS (BTC/ETH @ 4h dual-leg MVP)
 
 ---
 
@@ -15,10 +15,27 @@ We are implementing an enhanced cointegration pairs trading strategy on crypto f
 This is Candidate L in our Research Log. A co-developer project running in parallel with Candidate J (Ensemble Donchian Trend-Following).
 
 ### Current Phase
-- **Phase:** 0 — Pair Discovery + Frequency Validation
-- **Last completed:** [Not started]
-- **Next immediate step:** Run the existing `cointpairs_phase0_validation.py` (v4) pipeline at 1h across a 10-pair matrix (Palazzi's design), identify cointegrated pairs, validate that reversion half-life is compatible with hourly trading
+- **Phase:** 1 — Dual-leg Freqtrade implementation (focused on best Phase 0 pair first)
+- **Phase 0 completed:** 1h matrix → MARGINAL only; **4h fallback** → multiple **GO** rows (see `user_data/results/cointpairs_phase0_summary.csv`). **Primary Phase 1 pair:** BTC/ETH @ **4h**.
+- **Phase 1 implementation:** `user_data/strategies/EnhancedCointPairsStrategy_V01.py` + `config/config_cointpairs_l_phase1.json`. **β-weighted stakes** (mandatory for dollar hedge). Palazzi **vol filter** + **spread trailing** implemented as **`ENABLE_VOL_FILTER` / `ENABLE_SPREAD_TRAIL`** (default **False**) — lab backtests showed they **compressed** net P&L vs **z-reversion + time stop** alone on this pair/TF; enable for live risk experiments.
+- **Backtest recap (single place to compare all runs):** `user_data/results/cointpairs_comparison_tables.md` — markdown tables aggregating V01 default, V02 default, V01 hyperopt (calendar windows), plus the β-churn sweep vs V01/V02 on 2024 and 2025–26 Q1. Source CSVs: `cointpairs_walk_forward.csv`, `cointpairs_walk_forward_v02.csv`, `cointpairs_walk_forward_v01_default_vs_hyperopt.csv`, `cointpairs_beta_churn_sweep.csv`.
+- **Walk-forward (defaults, no sidecar JSON):** `python user_data/scripts/cointpairs_walk_forward.py` (Docker). **V01** baseline CSV: `user_data/results/cointpairs_walk_forward.csv`.
+- **V02 (`EnhancedCointPairsStrategy_V02`) — β-churn entry filter:** Skips entries when rolling mean `|Δβ|` over `beta_churn_window` exceeds `beta_churn_max` (defaults **12** bars / **0.0085**). Both are **`space="buy"`** hyperopt parameters. Tracked default sidecar: `user_data/strategy_params/EnhancedCointPairsStrategy_V02_defaults.json`. Full-sample defaults **beat V01** on total return (**~+27.7%** vs **~+25.7%**) and flip **2023** from slightly negative to **~+3.6%**; **2022** is worse than V01 (**~−0.5%** vs **~+8.4%**) — explicit trade-off. CSV: `user_data/results/cointpairs_walk_forward_v02.csv`.
+- **β-churn grid (soften 2022 vs keep 2023/2024):** `python user_data/scripts/cointpairs_beta_churn_sweep.py` — sweeps `beta_churn_max` (and optionally `beta_churn_window` with `--sweep-window`) → `user_data/results/cointpairs_beta_churn_sweep.csv`. Example: `--quick` (2024 + 2025–26 only) or full calendar windows.
+- **Lever sweep (entry/exit/z/ols/churn, V01, V02@1h, extra GO pairs):** `python user_data/scripts/cointpairs_lever_sweep.py` → `user_data/results/cointpairs_lever_sweep.csv`. `--quick` uses 2024 only (fast); default timerange `20220101–20260331`. **Config** `cointpairs.traded` / `cointpairs.anchor` + whitelist drive pair selection (see `config_cointpairs_l_phase1.json`). **Interpret multi-pair rows with care** — some pairs show extreme full-sample P&L vs one-year slice; validate before forward tests.
+- **BNB/SOL deep-dive bundle (preserved):** `user_data/results/cointpairs_bnb_sol_4h_analysis/` — params + config snapshots, `SUMMARY.txt`, Freqtrade `backtest-result-*.zip` (trades export), `RUN_MANIFEST.md` for reproduction. Use for detailed analysis; do not rely on a stray `EnhancedCointPairsStrategy_V02.json` in `strategies/` (removed after snapshot; restore from `strategy_params_snapshot.json` if needed).
+- **Hyperopt V02 (do not pass `--cache` to hyperopt):** `docker compose run --rm freqtrade hyperopt --config /freqtrade/config/config_cointpairs_l_phase1.json --strategy EnhancedCointPairsStrategy_V02 --hyperopt-loss SharpeHyperOptLoss --spaces buy sell --epochs 50 --timerange 20220101-20241231 --min-trades 15`
+- **V01 default vs hyperopt (same script, `--compare --params-json user_data/strategy_params/EnhancedCointPairsStrategy_V01_hyperopt_2026-03-31.json`):** CSV `user_data/results/cointpairs_walk_forward_v01_default_vs_hyperopt.csv`. **Hyperopt params are not robust on the full timerange** (full sample **~−4.3%** vs default **~+25.7%**); use sidecar JSON only with **window-matched** validation, not as global defaults.
+- **Next immediate step:** Dry-run `trade` on VPS (see command below); optional multi-pair expansion; longer hyperopt only after walk-forward review.
+- **Hyperopt (2026-03-31):** In-sample `20220101–20241231`, 40 epochs, `buy`+`sell` spaces, `SharpeHyperOptLoss`, `--min-trades 20`. Best epoch (train only): `entry_zscore` 2.89, `ols_window` 133, `zscore_window` 45, `exit_zscore` 0.04, `max_hold_candles` 318 — saved as `user_data/hyperopt_results/EnhancedCointPairsStrategy_V01_best_params_2026-03-31.json`. **Do not** leave a same-named `.json` next to the strategy unless you intend to load it: copy that file to `user_data/strategies/EnhancedCointPairsStrategy_V01.json` to apply, or delete that file to use `DecimalParameter` defaults in code.
+- **OOS sanity (20250101–20260331, with best JSON applied):** ~+4.5% total, PF ~1.11, 30 trades — positive but far below in-sample; treat hyperopt as exploratory until walk-forward confirms.
 - **Blocking issues:** None
+
+**Dry-run (one-off container, overrides compose `command`):**
+
+`docker compose run --rm freqtrade trade --config /freqtrade/config/config_cointpairs_l_phase1.json --strategy EnhancedCointPairsStrategy_V01 --db-url sqlite:////freqtrade/user_data/tradesv3.cointpairs_l.dryrun.sqlite --logfile /freqtrade/user_data/logs/freqtrade_cointpairs_l.log --userdir /freqtrade/user_data`
+
+(Ensure `dry_run: true` and API keys as required by your exchange tier; use a dedicated SQLite DB so it does not overwrite other bots.)
 
 ### Key Context from Research Log
 - We are Co-Investigators, Co-Strategists, and Co-Developers. Claude pushes back on bad ideas. See Research Log Section 1.
@@ -311,8 +328,22 @@ This yields **45 unique pairs** for cointegration screening. Not all will be coi
 
 | File | Purpose | Status |
 |---|---|---|
-| `user_data/strategies/EnhancedCointPairsStrategy_V01.py` | Dual-leg pairs trading (MVP) | To build (Phase 1) |
-| `config/config_cointpairs_v2.json` | Strategy config (10 assets, futures, 1h) | To build (Phase 0) |
+| `user_data/strategies/EnhancedCointPairsStrategy_V01.py` | Dual-leg BTC/ETH @ 4h (β stakes; optional vol/trail flags) | **Built** — Phase 1 |
+| `user_data/strategies/EnhancedCointPairsStrategy_V02.py` | V01 + β-churn entry filter (`BETA_CHURN_MAX`); preferred lab default vs V01 | **Built** — Phase 1+ |
+| `user_data/strategy_params/EnhancedCointPairsStrategy_V01_hyperopt_2026-03-31.json` | Tracked hyperopt params (repro); `user_data/hyperopt_results/` copy may be gitignored | **Tracked** |
+| `user_data/strategy_params/EnhancedCointPairsStrategy_V02_defaults.json` | V02 code-default buy/sell + sidecar JSON | **Tracked** |
+| `user_data/scripts/cointpairs_beta_churn_sweep.py` | Grid `beta_churn_max` / optional `beta_churn_window` | **Built** |
+| `user_data/scripts/cointpairs_lever_sweep.py` | OAT levers + V01 + V02@1h + GO pairs | **Built** |
+| `user_data/results/cointpairs_lever_sweep.csv` | Lever sweep output | **Updated** |
+| `user_data/results/cointpairs_beta_churn_sweep.csv` | Output of churn sweep | **Updated** |
+| `user_data/results/cointpairs_comparison_tables.md` | **Recap:** merged tables (V01/V02/hyperopt + churn sweep) | **Active** |
+| `user_data/results/cointpairs_walk_forward.csv` | V01 defaults, all calendar windows | **Updated** |
+| `user_data/hyperopt_results/EnhancedCointPairsStrategy_V01_best_params_2026-03-31.json` | Local hyperopt export (may be gitignored) | Optional |
+| `user_data/scripts/cointpairs_walk_forward.py` | Multi-window backtests; `--compare`, `--params-json`, `--strategy` | **Built** |
+| `user_data/results/cointpairs_walk_forward_v02.csv` | Walk-forward V02 | **Updated** |
+| `user_data/results/cointpairs_walk_forward_v01_default_vs_hyperopt.csv` | Default vs hyperopt V01 | **Updated** |
+| `config/config_cointpairs_l_phase1.json` | BTC+ETH only, Phase 1 backtest | **Built** |
+| `config/config_cointpairs_v2.json` | 10-asset download / future multi-pair | **Built** (Phase 0 data) |
 | `user_data/scripts/cointpairs_phase0_validation.py` | **EXISTING** Phase 0 pipeline (v4) — adapt for 1h and dual-leg fee calc | Reuse + adapt |
 | `user_data/strategies/CointPairsStrategy_V02.py` | **EXISTING** F's single-leg strategy — reference only | Reference |
 | `user_data/info/EnhancedCointPairs_Dev_Plan.md` | THIS FILE | Active |
