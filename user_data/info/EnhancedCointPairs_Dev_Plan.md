@@ -143,10 +143,10 @@ This is the primary engineering challenge (F's criterion 3 conditional pass). Fr
 │  │    IF orphan leg detected → force close + log     │   │
 │  └───────────────────────────────────────────────────┘   │
 │                                                          │
-│  SHARED with LiqCascade / Candidate J:                   │
-│  - DigitalOcean droplet infrastructure                   │
-│  - Docker compose (new profile: cointpairs_v2)           │
-│  - Separate Freqtrade instance + config + DB             │
+│  FORWARD-TEST (deploy repo — see Part 6):                │
+│  - DigitalOcean: two droplets (V01 profile vs V02 profile) │
+│  - Six Freqtrade services: three spreads × two versions   │
+│  - Repo: whitneyjohn61/freqtrade-coint-pairs-trading     │
 │                                                          │
 │  REUSES from F: Phase 0 validation pipeline              │
 │  (cointpairs_phase0_validation.py v4)                    │
@@ -292,20 +292,22 @@ This yields **45 unique pairs** for cointegration screening. Not all will be coi
 
 ### Phase 3: Dry-Run Deployment (Week 2+)
 
-**Goal:** Deploy alongside LiqCascade (and possibly J), accumulate forward-testing data. Validate that dual-leg coordination works in live market conditions (not just backtest).
+**Goal:** Forward-test Candidate L on Binance USDT-M with the **deploy-only** repo (see **Part 6**). Validate dual-leg coordination in live market conditions (not just backtest). LiqCascade / Candidate J may run elsewhere; L’s production layout is **not** a shared single-droplet compose profile.
+
+**Implemented layout:**
+- Repository **`freqtrade-coint-pairs-trading`** (`https://github.com/whitneyjohn61/freqtrade-coint-pairs-trading`): **`docker compose --profile v01`** on one droplet, **`--profile v02`** on a second droplet; six containers (three spreads × V01 vs V02). Details: Part 6 and `deploy/README.md` in that repo.
 
 **Tasks:**
-1. Add `cointpairs_v2` profile to Docker compose on droplet
-2. Deploy as separate Freqtrade instance
-3. **Critical live-monitoring:** Watch for orphan legs in the first 48 hours. A coordination failure in live trading is far worse than in backtest.
-4. Monitor for 2+ weeks
+1. Provision droplets, firewall (SSH + UI ports per profile), clone deploy repo, generate config secrets — see **`deploy/README.md`**.
+2. **Critical live-monitoring:** Watch for orphan legs in the first 48 hours. A coordination failure in live trading is far worse than in backtest.
+3. Monitor for 2+ weeks.
 
 **Go/No-Go for Phase 4 (live capital):**
 - 2+ weeks, minimum 15 completed pair trades (both legs)
 - Zero orphan legs in production
 - Total return consistent with backtest expectation
 - Trade frequency within 30% of backtest
-- Stable coexistence with LiqCascade (and J if deployed) on shared droplet
+- Comfortable coexistence with other strategies **only after** confirming margin, rate limits, and ops runbooks — L runs as dedicated compose profiles on the deploy droplet(s), not embedded in the lab `docker-compose.yml`
 
 ---
 
@@ -346,7 +348,8 @@ This yields **45 unique pairs** for cointegration screening. Not all will be coi
 | `config/config_cointpairs_v2.json` | 10-asset download / future multi-pair | **Built** (Phase 0 data) |
 | `user_data/scripts/cointpairs_phase0_validation.py` | **EXISTING** Phase 0 pipeline (v4) — adapt for 1h and dual-leg fee calc | Reuse + adapt |
 | `user_data/strategies/CointPairsStrategy_V02.py` | **EXISTING** F's single-leg strategy — reference only | Reference |
-| `user_data/info/EnhancedCointPairs_Dev_Plan.md` | THIS FILE | Active |
+| `user_data/info/EnhancedCointPairs_Dev_Plan.md` | THIS FILE (canonical); mirrored in deploy repo | Active |
+| `freqtrade-coint-pairs-trading/user_data/info/EnhancedCointPairs_Dev_Plan.md` | Same document for operators cloning deploy repo only | Mirror |
 | `user_data/info/AlgoTrading_Research_Log.md` | Project-wide context | Active |
 | `user_data/info/CointPairsTrading_Deep_Dive.md` | F's deep dive — failure modes documented | Reference (ARCHIVED) |
 
@@ -369,21 +372,50 @@ This yields **45 unique pairs** for cointegration screening. Not all will be coi
 
 ---
 
-## Part 6: Reference Material
+## Part 6: Deploy repository (`freqtrade-coint-pairs-trading`)
 
-### 6.1 Key Papers
+**Purpose:** Standalone forward-test deployment for Candidate L — **EnhancedCointPairsStrategy_V01** vs **V02** on Binance USDT-M futures, without the full `freqtrade-strategy-lab` tree.
+
+**Repository:** [https://github.com/whitneyjohn61/freqtrade-coint-pairs-trading](https://github.com/whitneyjohn61/freqtrade-coint-pairs-trading) (SSH: `git@github.com:whitneyjohn61/freqtrade-coint-pairs-trading.git`).
+
+**Division of labor:**
+| Location | Role |
+|----------|------|
+| **`freqtrade-strategy-lab`** | Research, data download, Phase 0 pipeline, backtests, walk-forward scripts, hyperopt, comparison tables, canonical strategy development |
+| **`freqtrade-coint-pairs-trading`** | Deploy-only: `Dockerfile` / `freqtradeorg/freqtrade:stable`, `docker-compose.yml`, strategy copies, config **templates**, `scripts/` (droplet setup, status, trade summaries), **`deploy/README.md`** |
+
+**Runtime topology (DigitalOcean):**
+- **Droplet A:** `docker compose --profile v01 up -d` — **V01 only**. Freqtrade UI on host ports **8080** (BTC/ETH), **8081** (BNB/SOL), **8082** (BTC/SOL).
+- **Droplet B:** `docker compose --profile v02 up -d` — **V02 only**. Same three spreads on **8083**, **8084**, **8085**.
+
+**Configs** (built from `config/templates/`; generated JSON with `jwt_secret_key` / UI password is **gitignored**):
+- `config_cointpairs_l_phase1.json` — traded/anchor BTC / ETH  
+- `config_cointpairs_l_phase1_bnb_sol.json` — BNB / SOL  
+- `config_cointpairs_l_phase1_btc_sol.json` — BTC / SOL  
+
+**V01** in the deploy repo matches the lab’s dual-leg logic but reads **`cointpairs`** from config (required for the three spreads). **`dry_run`** defaults true in templates; add Binance API keys before live trading.
+
+**Where to read next:** Repo **`README.md`** (setup, `generate_api_secrets.py`, quick start). **`deploy/README.md`** — firewall (SSH + UI ports), `droplet_setup_from_local.ps1` / `droplet_setup.sh`, `droplet_status_from_local.ps1` (both droplets: docker state, logs, trades). Optional env: `FT_V01_HOST`, `FT_V02_HOST`, `FT_SSH_USER` — see `scripts/local.env.example`.
+
+**This document:** Maintained canonically under **`freqtrade-strategy-lab`** at `user_data/info/EnhancedCointPairs_Dev_Plan.md` and **copied** into the deploy repo (same path under `user_data/info/`) so operators who only clone **`freqtrade-coint-pairs-trading`** have the full Candidate L plan.
+
+---
+
+## Part 7: Reference Material
+
+### 7.1 Key Papers
 - **Palazzi (J. Futures Markets, Aug 2025):** "Trading Games: Beating Passive Strategies in the Bullish Crypto Market" — Primary source. Adaptive trailing stop, vol filter, grid-search lookback optimization, walk-forward validation. 10 cryptos, bull + bear regime performance.
 - **Tadi & Witzany (Financial Innovation, 2025):** "Copula-based trading of cointegrated cryptocurrency Pairs" — Copula approach on Binance USDT-margined futures. Weekly pair re-selection. Outperforms standard methods. Our exact venue.
 - **IEEE Xplore (2020):** "Pairs Trading in Cryptocurrency Markets" — 26 cryptos at 5-min, 1h, daily on Binance. Critical finding: frequency matters enormously (5-min: +11.61%/month vs daily: −0.07%/month).
 - **Our CointPairs (F) post-mortem:** Research Log Section 4.1. Signal real, failure structural. Phase 0 validation framework reusable.
 
-### 6.2 Freqtrade Implementation References
+### 7.2 Freqtrade Implementation References
 - **Simultaneous long/short:** Freqtrade supports `can_short = True` in futures mode
 - **Paired coordination:** `confirm_trade_entry()` for pre-entry validation, `custom_exit()` for paired exits, `bot_loop_start()` for cross-pair state management
 - **Custom trailing stop:** `custom_stoploss()` — return negative value; can reference `self.custom_info` for spread-based stop levels
 - **Informative pairs:** `informative_pairs()` for loading all 10 assets
 
-### 6.3 Relationship to F's Codebase
+### 7.3 Relationship to F's Codebase
 L reuses:
 - `cointpairs_phase0_validation.py` (v4) — adapt fee calculation for dual-leg (20 bps not 10 bps)
 - Cointegration testing methodology (ADF, EG, Johansen, Hurst, OU half-life)
@@ -396,15 +428,15 @@ L replaces:
 - Fixed lookback → grid-search optimized lookback
 - Single-pair → multi-pair universe
 
-### 6.4 Coordination with Candidate J
+### 7.4 Coordination with Candidate J
 J and L are designed to be **uncorrelated and concurrent:**
 - J is long-only trend-following (serial correlation). L is market-neutral mean-reversion (equilibrium reversion).
 - J performs best in trending markets. L performs best in ranging markets.
-- J uses 20 pairs independently. L uses 10 assets in paired combinations.
-- They share infrastructure (droplet, Docker) but run as separate Freqtrade instances with separate DBs.
-- If both validate, deploying them together provides genuine strategy diversification.
+- J uses 20 pairs independently. L uses 10 assets in paired combinations (lab); forward-test deploy runs the **three** spreads configured in **`freqtrade-coint-pairs-trading`**.
+- They may share organizational habits (DigitalOcean, Docker) but **Candidate L production** uses the **dedicated** deploy repo and droplet layout in Part 6 — not the same compose stack as J unless you intentionally colocate on one host.
+- If both validate, deploying them together can provide genuine strategy diversification when margin and ops constraints allow.
 
 ---
 
-*Document maintained by: Claude + co-developer*
-*Last updated: 2026-03-31 — Initial creation*
+*Document maintained by: Claude + co-developer*  
+*Last updated: 2026-04-02 — Added Part 6 deploy repo (`freqtrade-coint-pairs-trading`), DigitalOcean two-droplet layout, mirror path; Phase 3 and architecture aligned with production.*
