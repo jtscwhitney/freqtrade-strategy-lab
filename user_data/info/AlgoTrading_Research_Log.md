@@ -41,6 +41,7 @@
 - `deploy/digitalocean.md` — DigitalOcean deployment reference (added with Candidate E)
 - `user_data/info/EnsembleDonchianTrend_Dev_Plan.md` — Candidate J development plan (NEW)
 - `user_data/info/EnhancedCointPairs_Dev_Plan.md` — Candidate L development plan (NEW)
+- `user_data/info/EnhancedCointPairs_Deep_Dive.md` — Candidate L deep dive (ACTIVE; mirrored in `freqtrade-coint-pairs-trading`)
 
 **Research & Development Workflow:**
 

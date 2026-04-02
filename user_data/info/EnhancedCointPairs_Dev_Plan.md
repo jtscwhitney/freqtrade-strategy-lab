@@ -349,7 +349,9 @@ This yields **45 unique pairs** for cointegration screening. Not all will be coi
 | `user_data/scripts/cointpairs_phase0_validation.py` | **EXISTING** Phase 0 pipeline (v4) — adapt for 1h and dual-leg fee calc | Reuse + adapt |
 | `user_data/strategies/CointPairsStrategy_V02.py` | **EXISTING** F's single-leg strategy — reference only | Reference |
 | `user_data/info/EnhancedCointPairs_Dev_Plan.md` | THIS FILE (canonical); mirrored in deploy repo | Active |
+| `user_data/info/EnhancedCointPairs_Deep_Dive.md` | Candidate L narrative, lab results summary, deploy topology | Active |
 | `freqtrade-coint-pairs-trading/user_data/info/EnhancedCointPairs_Dev_Plan.md` | Same document for operators cloning deploy repo only | Mirror |
+| `freqtrade-coint-pairs-trading/user_data/info/EnhancedCointPairs_Deep_Dive.md` | Mirror of deep dive | Mirror |
 | `user_data/info/AlgoTrading_Research_Log.md` | Project-wide context | Active |
 | `user_data/info/CointPairsTrading_Deep_Dive.md` | F's deep dive — failure modes documented | Reference (ARCHIVED) |
 
