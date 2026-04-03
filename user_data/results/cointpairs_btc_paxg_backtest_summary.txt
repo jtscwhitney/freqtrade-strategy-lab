@@ -1,0 +1,40 @@
+BTC/PAXG lab backtests — Enhanced Coint Pairs (Candidate L)
+Generated: 2026-04-03
+
+Timerange: 20250327-20260331 (369 days). PAXG USDT-M 4h data on Binance starts ~2025-03-27.
+Config: config/config_cointpairs_l_phase1_btc_paxg.json (traded BTC/USDT:USDT, anchor PAXG/USDT:USDT)
+
+Note: EnhancedCointPairsStrategy_V01 was updated 2026-04-03 to read config["cointpairs"] like V02.
+Earlier runs that hardcoded ETH would invalidate BTC/PAXG results.
+
+--- Apples-to-apples baseline (same window) ---
+BTC/ETH | EnhancedCointPairsStrategy_V01 | config_cointpairs_l_phase1.json
+  Total profit %: +1.87%
+  Profit factor: 1.03
+  Trades: 40 (20 per leg)
+  Sharpe: 0.03
+  Max drawdown %: 13.31%
+  Long/Short profit %: -5.60% / +7.47%
+
+--- BTC/PAXG ---
+V01:
+  Total profit %: -46.92%
+  Profit factor: 0.23
+  Trades: 32 (paired legs)
+  Sharpe: -0.90
+  Max drawdown %: 46.92%
+  Long/Short profit %: -20.76% / -26.15%
+  Exit mix: mostly exit_signal; 6 orphan_close
+
+V02 (beta-churn defaults):
+  Total profit %: -18.66%
+  Profit factor: 0.00
+  Trades: 4 (all losses)
+  Sharpe: -0.36
+
+Conclusion (lab): Do not add BTC/PAXG to deploy droplets on default parameters.
+Run Phase 0 validation on BTC/PAXG before any re-test; short history limits statistical confidence.
+
+Reproduce:
+  docker compose run --rm freqtrade download-data --config /freqtrade/config/config_cointpairs_l_phase1_btc_paxg.json --timerange 20250301-20260331 -t 4h
+  docker compose run --rm freqtrade backtesting --config /freqtrade/config/config_cointpairs_l_phase1_btc_paxg.json --strategy EnhancedCointPairsStrategy_V01 --timerange 20250327-20260331 -i 4h --cache none

@@ -9,7 +9,7 @@
 > Use with `AlgoTrading_Research_Log.md` (registry), `EnhancedCointPairs_Dev_Plan.md` (roadmap + commands), and — for production — `freqtrade-coint-pairs-trading` (deploy repo).
 
 ### Current Status
-- **Lab (`freqtrade-strategy-lab`):** Dual-leg **EnhancedCointPairsStrategy_V01** / **V02** @ **4h**; Phase 0 matrix → **4h** produced multiple **GO** pairs; primary backtest focus **BTC/ETH**. Walk-forward CSVs and comparison tables under `user_data/results/`. Palazzi **vol filter** + **spread trailing** exist as flags (`ENABLE_VOL_FILTER`, `ENABLE_SPREAD_TRAIL`) default **off** — lab showed they **reduced** net P&L vs z-reversion + time stop on the tested pair/TF.
+- **Lab (`freqtrade-strategy-lab`):** Dual-leg **EnhancedCointPairsStrategy_V01** / **V02** @ **4h**; Phase 0 matrix → **4h** produced multiple **GO** pairs; primary backtest focus **BTC/ETH**. **BTC/PAXG** (tokenized gold vs BTC) is an additional **lab** pair — `config/config_cointpairs_l_phase1_btc_paxg.json`; short perp history (from ~Mar 2025). Walk-forward CSVs and comparison tables under `user_data/results/`. Palazzi **vol filter** + **spread trailing** exist as flags (`ENABLE_VOL_FILTER`, `ENABLE_SPREAD_TRAIL`) default **off** — lab showed they **reduced** net P&L vs z-reversion + time stop on the tested pair/TF.
 - **Deploy (`freqtrade-coint-pairs-trading`):** Standalone repo on **whitneyjohn61** — **six** Freqtrade processes: **three spreads** (BTC/ETH, BNB/SOL, BTC/SOL) × **V01** (compose profile `v01`) on one DigitalOcean droplet and **V02** (`v02`) on a second. `dry_run` default true in templates; see repo `README.md` and `deploy/README.md`.
 - **Versus archived Candidate F:** F failed on **single-leg** exposure and **~0.05 trades/day** on the only GO pair. L is **dual-leg**, **β-weighted stakes**, with **orphan-leg** safeguards; literature layer adds adaptive trailing + vol filter (optional in code).
 
@@ -21,6 +21,10 @@ docker compose run --rm --entrypoint python freqtrade user_data/scripts/cointpai
 
 # Example backtest (BTC/ETH Phase 1 config)
 docker compose run --rm freqtrade backtesting --config /freqtrade/config/config_cointpairs_l_phase1.json --strategy EnhancedCointPairsStrategy_V01 --timerange 20220101-20260331 --cache none
+
+# BTC/PAXG (perp data from ~Mar 2025 — use timerange from first PAXG candle onward)
+docker compose run --rm freqtrade download-data --config /freqtrade/config/config_cointpairs_l_phase1_btc_paxg.json --timerange 20250301-20260331 -t 4h
+docker compose run --rm freqtrade backtesting --config /freqtrade/config/config_cointpairs_l_phase1_btc_paxg.json --strategy EnhancedCointPairsStrategy_V01 --timerange 20250327-20260331 -i 4h --cache none
 ```
 
 ### File Locations
@@ -79,6 +83,7 @@ Full F post-mortem: `user_data/info/CointPairsTrading_Deep_Dive.md`.
 
 - **Implemented TF:** **4h** (Phase 0 showed **1h** matrix marginal; **4h** multiple GO — aligns dev plan “Primary Phase 1 pair: BTC/ETH @ 4h”).
 - **Deploy spreads:** BTC/ETH, BNB/SOL, BTC/SOL — each **one process** (`cointpairs.traded` / `cointpairs.anchor` + whitelist), not multi-pair in one process.
+- **Lab-only (proxy):** **BTC/PAXG** — same mechanics; **PAXG/USDT:USDT** USDT-M perp on Binance (listed ~2025). Not on deploy droplets until lab backtests support it (see Part 3).
 
 ---
 
@@ -97,6 +102,8 @@ Full F post-mortem: `user_data/info/CointPairsTrading_Deep_Dive.md`.
 **β-churn sweep:** See comparison tables §2; tightening churn can change 2024 vs 2025–26 behavior — interpret before changing production defaults.
 
 **OOS note:** Dev plan records short OOS sanity window positive but **below** in-sample hype — treat hyperopt as exploratory.
+
+**BTC/PAXG (lab, 2026-04-03):** Same default parameters as BTC/ETH; timerange **20250327–20260331** (~12 months of overlapping perp data). **V01 ≈ −47%** total, PF **0.23**, **32** trades. **V02** (β-churn) **≈ −19%**, **4** trades, 0 wins. Baseline **BTC/ETH** on the **same window** was **≈ +1.9%**, PF **1.03**, **40** trades — proxy pair underperforms sharply. **Do not add BTC/PAXG to deploy droplets** on these defaults; run **Phase 0** on BTC/PAXG and treat re-tuning as a separate experiment. Details: `user_data/results/cointpairs_btc_paxg_backtest_summary.txt`.
 
 ---
 

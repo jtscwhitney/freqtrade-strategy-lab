@@ -1,13 +1,16 @@
 # pragma pylint: disable=missing-docstring, invalid-name, pointless-string-statement
 # flake8: noqa
 """
-EnhancedCointPairsStrategy_V01 — Candidate L Phase 1: dual-leg BTC/ETH @ 4h
+EnhancedCointPairsStrategy_V01 — Candidate L Phase 1: dual-leg coint pair @ 4h
 
-Phase 0: BTC/ETH@4h scored GO (6/8). Dual-leg spread: log(BTC) - β * log(ETH).
+Default pair: BTC/ETH (Phase 0 GO). Spread: log(traded) - β * log(anchor).
+
+Optional `config["cointpairs"]`: `{"traded": "...", "anchor": "..."}` (Binance USDT-M symbols).
+`exchange.pair_whitelist` must list exactly those two pairs.
 
 Entries:
-- z > +ENTRY: short BTC, long ETH
-- z < -ENTRY: long BTC, short ETH
+- z > +ENTRY: short traded, long anchor
+- z < -ENTRY: long traded, short anchor
 - Optional vol filter (Palazzi-style): spread vol vs rolling p90 — **off by default**; lab backtests showed
   it + spread trail cut net P&L vs z-reversion + time stop on this pair/TF.
 
@@ -17,7 +20,7 @@ Exits:
 - Time stop
 - Orphan / partner_closed: dual-leg safety
 
-`custom_stake_amount`: β-weights 1/(1+β) BTC, β/(1+β) ETH per slot.
+`custom_stake_amount`: β-weights 1/(1+β) traded leg, β/(1+β) anchor leg per slot.
 
 Set ENABLE_VOL_FILTER / ENABLE_SPREAD_TRAIL True to experiment toward Palazzi-style live risk control.
 """
@@ -70,25 +73,25 @@ class EnhancedCointPairsStrategy_V01(IStrategy):
     # Only for missing partner at entry; not when partner already exited (trail/z).
     ORPHAN_MAX_CANDLES: int = 6
 
-    _ANCHOR = "ETH/USDT:USDT"
-    _TRADED = "BTC/USDT:USDT"
-
     def __init__(self, config: dict) -> None:
         super().__init__(config)
+        cp = config.get("cointpairs") or {}
+        self._traded = str(cp.get("traded", "BTC/USDT:USDT"))
+        self._anchor = str(cp.get("anchor", "ETH/USDT:USDT"))
         # session_floor_str -> {"max": float, "min": float} for trailing (both legs share key)
         self._spread_extreme: dict[str, dict[str, float]] = {}
         self._had_partner: set[int] = set()  # trade ids that saw both legs open
 
     def informative_pairs(self) -> list[tuple[str, str]]:
         return [
-            (self._TRADED, self.inf_tf),
-            (self._ANCHOR, self.inf_tf),
+            (self._traded, self.inf_tf),
+            (self._anchor, self.inf_tf),
         ]
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         pair = metadata["pair"]
-        if pair == self._TRADED:
-            other = self.dp.get_pair_dataframe(self._ANCHOR, self.inf_tf)
+        if pair == self._traded:
+            other = self.dp.get_pair_dataframe(self._anchor, self.inf_tf)
             if other.empty:
                 return self._nan_frame(dataframe)
             other = other[["date", "close"]].rename(columns={"close": "anchor_close"})
@@ -100,7 +103,7 @@ class EnhancedCointPairsStrategy_V01(IStrategy):
             log_y = np.log(dataframe["close"])
             log_x = np.log(dataframe[acol])
         else:
-            other = self.dp.get_pair_dataframe(self._TRADED, self.inf_tf)
+            other = self.dp.get_pair_dataframe(self._traded, self.inf_tf)
             if other.empty:
                 return self._nan_frame(dataframe)
             other = other[["date", "close"]].rename(columns={"close": "traded_close"})
@@ -141,7 +144,7 @@ class EnhancedCointPairsStrategy_V01(IStrategy):
             ok = ok & (dataframe["spread_vol_ok"] == 1)
 
         ez = float(self.entry_zscore.value)
-        if pair == self._TRADED:
+        if pair == self._traded:
             dataframe.loc[ok & (dataframe["z_score"] < -ez), "enter_long"] = 1
             dataframe.loc[ok & (dataframe["z_score"] > ez), "enter_short"] = 1
         else:
@@ -155,7 +158,7 @@ class EnhancedCointPairsStrategy_V01(IStrategy):
         has_signal = dataframe["z_score"].notna()
 
         xz = float(self.exit_zscore.value)
-        if pair == self._TRADED:
+        if pair == self._traded:
             dataframe.loc[has_signal & (dataframe["z_score"] > -xz), "exit_long"] = 1
             dataframe.loc[has_signal & (dataframe["z_score"] < xz), "exit_short"] = 1
         else:
@@ -177,13 +180,13 @@ class EnhancedCointPairsStrategy_V01(IStrategy):
         **kwargs,
     ) -> bool:
         """Do not stack beyond two pair legs; block duplicate same-pair entries."""
-        open_bt = [t for t in Trade.get_open_trades() if t.pair == self._TRADED]
-        open_eth = [t for t in Trade.get_open_trades() if t.pair == self._ANCHOR]
-        if pair == self._TRADED and open_bt:
+        open_traded = [t for t in Trade.get_open_trades() if t.pair == self._traded]
+        open_anchor = [t for t in Trade.get_open_trades() if t.pair == self._anchor]
+        if pair == self._traded and open_traded:
             return False
-        if pair == self._ANCHOR and open_eth:
+        if pair == self._anchor and open_anchor:
             return False
-        if len(open_bt) + len(open_eth) >= 2:
+        if len(open_traded) + len(open_anchor) >= 2:
             return False
         return True
 
@@ -192,8 +195,8 @@ class EnhancedCointPairsStrategy_V01(IStrategy):
         return str(ts.value)
 
     def _is_short_spread_leg(self, trade: Trade) -> bool:
-        """Short-spread regime: BTC short + ETH long (z > ENTRY)."""
-        if trade.pair == self._TRADED:
+        """Short-spread regime: short traded + long anchor (z > ENTRY)."""
+        if trade.pair == self._traded:
             return bool(trade.is_short)
         return not bool(trade.is_short)
 
@@ -201,9 +204,9 @@ class EnhancedCointPairsStrategy_V01(IStrategy):
         return int(pd.Timedelta(self.timeframe).total_seconds())
 
     def _both_pair_legs_open(self) -> bool:
-        """True when BTC and ETH each have an open trade (paired session)."""
-        pairs = {t.pair for t in Trade.get_open_trades() if t.pair in (self._TRADED, self._ANCHOR)}
-        return self._TRADED in pairs and self._ANCHOR in pairs
+        """True when traded and anchor each have an open trade (paired session)."""
+        pairs = {t.pair for t in Trade.get_open_trades() if t.pair in (self._traded, self._anchor)}
+        return self._traded in pairs and self._anchor in pairs
 
     def custom_exit(
         self,
@@ -297,9 +300,9 @@ class EnhancedCointPairsStrategy_V01(IStrategy):
         if np.isnan(beta) or beta <= 0:
             return proposed_stake
         den = 1.0 + beta
-        w_btc = 1.0 / den
-        w_eth = beta / den
-        w = w_btc if pair == self._TRADED else w_eth
+        w_traded = 1.0 / den
+        w_anchor = beta / den
+        w = w_traded if pair == self._traded else w_anchor
         stake = proposed_stake * w
         if min_stake is not None:
             stake = max(stake, min_stake)
