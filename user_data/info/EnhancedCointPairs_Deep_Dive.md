@@ -110,7 +110,7 @@ Full F post-mortem: `user_data/info/CointPairsTrading_Deep_Dive.md`.
 | Spread (traded → anchor) | Total % | Profit factor | Max drawdown % | Trades | Notes |
 |--------------------------|---------|---------------|----------------|--------|--------|
 | **LINK → ETH** | **≈ −59.5%** | 0.68 | ≈ 69.1% | 140 | Poor — do **not** add on defaults. |
-| **UNI → SOL** | **≈ +21.6%** | **1.03** | ≈ **65.3%** | 148 | Only positive headline of the three; **not** droplet-ready — **2× ~−99% stop_loss** exits, **1** liquidation, very asymmetric per-leg P&amp;L (SOL leg ~+90% vs UNI ~−69% aggregate). Treat as **tail-risk** until walk-forward / risk work. |
+| **UNI → SOL** | **≈ +21.6%** | **1.03** | ≈ **65.3%** | 148 | Only positive headline of the three; **not** droplet-ready — **2× ~−99% stop_loss** exits, **1** liquidation, very asymmetric per-leg P&L (SOL leg ~+90% vs UNI ~−69% aggregate). Treat as **tail-risk** until walk-forward / risk work. |
 | **XMR → BTC** | **≈ −50.8%** | 0.78 | ≈ 67.1% | 150 | Poor — do **not** add on defaults. |
 
 **Deploy decision:** No new droplet instances for these three on **V01 defaults**. Revisit UNI/SOL only after dedicated analysis (parameters, leverage, stops) if at all.
