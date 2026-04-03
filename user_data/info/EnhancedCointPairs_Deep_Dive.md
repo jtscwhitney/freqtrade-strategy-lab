@@ -9,7 +9,7 @@
 > Use with `AlgoTrading_Research_Log.md` (registry), `EnhancedCointPairs_Dev_Plan.md` (roadmap + commands), and — for production — `freqtrade-coint-pairs-trading` (deploy repo).
 
 ### Current Status
-- **Lab (`freqtrade-strategy-lab`):** Dual-leg **EnhancedCointPairsStrategy_V01** / **V02** @ **4h**; Phase 0 matrix → **4h** produced multiple **GO** pairs; primary backtest focus **BTC/ETH**. **BTC/PAXG** (tokenized gold vs BTC) is an additional **lab** pair — `config/config_cointpairs_l_phase1_btc_paxg.json`; short perp history (from ~Mar 2025). Walk-forward CSVs and comparison tables under `user_data/results/`. Palazzi **vol filter** + **spread trailing** exist as flags (`ENABLE_VOL_FILTER`, `ENABLE_SPREAD_TRAIL`) default **off** — lab showed they **reduced** net P&L vs z-reversion + time stop on the tested pair/TF.
+- **Lab (`freqtrade-strategy-lab`):** Dual-leg **EnhancedCointPairsStrategy_V01** / **V02** @ **4h**; Phase 0 matrix → **4h** produced multiple **GO** pairs; primary backtest focus **BTC/ETH**. **BTC/PAXG** (tokenized gold vs BTC) is an additional **lab** pair — `config/config_cointpairs_l_phase1_btc_paxg.json`; short perp history (from ~Mar 2025). **Exploratory spreads (2026-04-03):** LINK/ETH, UNI/SOL, XMR/BTC backtested from the deploy repo — see Part 3; **not** added to droplets on these results. Walk-forward CSVs and comparison tables under `user_data/results/`. Palazzi **vol filter** + **spread trailing** exist as flags (`ENABLE_VOL_FILTER`, `ENABLE_SPREAD_TRAIL`) default **off** — lab showed they **reduced** net P&L vs z-reversion + time stop on the tested pair/TF.
 - **Deploy (`freqtrade-coint-pairs-trading`):** Standalone repo on **whitneyjohn61** — **six** Freqtrade processes: **three spreads** (BTC/ETH, BNB/SOL, BTC/SOL) × **V01** (compose profile `v01`) on one DigitalOcean droplet and **V02** (`v02`) on a second. `dry_run` default true in templates; see repo `README.md` and `deploy/README.md`.
 - **Versus archived Candidate F:** F failed on **single-leg** exposure and **~0.05 trades/day** on the only GO pair. L is **dual-leg**, **β-weighted stakes**, with **orphan-leg** safeguards; literature layer adds adaptive trailing + vol filter (optional in code).
 
@@ -105,6 +105,16 @@ Full F post-mortem: `user_data/info/CointPairsTrading_Deep_Dive.md`.
 
 **BTC/PAXG (lab, 2026-04-03):** Same default parameters as BTC/ETH; timerange **20250327–20260331** (~12 months of overlapping perp data). **V01 ≈ −47%** total, PF **0.23**, **32** trades. **V02** (β-churn) **≈ −19%**, **4** trades, 0 wins. Baseline **BTC/ETH** on the **same window** was **≈ +1.9%**, PF **1.03**, **40** trades — proxy pair underperforms sharply. **Do not add BTC/PAXG to deploy droplets** on these defaults; run **Phase 0** on BTC/PAXG and treat re-tuning as a separate experiment. Details: `user_data/results/cointpairs_btc_paxg_backtest_summary.txt`.
 
+**LINK/ETH, UNI/SOL, XMR/BTC (deploy repo backtest, 2026-04-03):** Screened **EnhancedCointPairsStrategy_V01** @ **4h**, **default** `DecimalParameter` values, Binance USDT-M futures, **`freqtradeorg/freqtrade:stable`**. **`--timerange 20220101-20260403`** (download + backtest); first trades after **500** startup candles on 4h → effective simulation **~2022-03-25** → **2026-04-03** (aligns with full-sample style **`20220101–20260331`** runs; end date differs by a few days). Configs live under **`freqtrade-coint-pairs-trading`** only: `config/config_cointpairs_l_phase1_link_eth.json`, `config/config_cointpairs_l_phase1_uni_sol.json`, `config/config_cointpairs_l_phase1_xmr_btc.json` (`cointpairs.traded` / `cointpairs.anchor` + matching `pair_whitelist`).
+
+| Spread (traded → anchor) | Total % | Profit factor | Max drawdown % | Trades | Notes |
+|--------------------------|---------|---------------|----------------|--------|--------|
+| **LINK → ETH** | **≈ −59.5%** | 0.68 | ≈ 69.1% | 140 | Poor — do **not** add on defaults. |
+| **UNI → SOL** | **≈ +21.6%** | **1.03** | ≈ **65.3%** | 148 | Only positive headline of the three; **not** droplet-ready — **2× ~−99% stop_loss** exits, **1** liquidation, very asymmetric per-leg P&amp;L (SOL leg ~+90% vs UNI ~−69% aggregate). Treat as **tail-risk** until walk-forward / risk work. |
+| **XMR → BTC** | **≈ −50.8%** | 0.78 | ≈ 67.1% | 150 | Poor — do **not** add on defaults. |
+
+**Deploy decision:** No new droplet instances for these three on **V01 defaults**. Revisit UNI/SOL only after dedicated analysis (parameters, leverage, stops) if at all.
+
 ---
 
 ## Part 4: Deploy Repository (`freqtrade-coint-pairs-trading`)
@@ -131,6 +141,7 @@ Full F post-mortem: `user_data/info/CointPairsTrading_Deep_Dive.md`.
 - `config_cointpairs_l_phase1.json` — BTC / ETH  
 - `config_cointpairs_l_phase1_bnb_sol.json` — BNB / SOL  
 - `config_cointpairs_l_phase1_btc_sol.json` — BTC / SOL  
+- **Lab-only reproduction (not compose-wired):** `config_cointpairs_l_phase1_link_eth.json`, `config_cointpairs_l_phase1_uni_sol.json`, `config_cointpairs_l_phase1_xmr_btc.json` — used for the Part 3 exploratory backtests; **not** production droplet services.
 
 Templates under `config/templates/`; `scripts/generate_api_secrets.py` for JWT/UI password.
 
@@ -188,3 +199,4 @@ Templates under `config/templates/`; `scripts/generate_api_secrets.py` for JWT/U
 | Date | Change |
 |------|--------|
 | 2026-04-02 | v1 — Deep dive created: research log, dev plan, deploy repo, lab results summary, chat-derived decision notes. |
+| 2026-04-03 | Part 3: LINK/ETH, UNI/SOL, XMR/BTC V01@4h backtest summary (deploy repo); Part 4.3: optional lab reproduction configs. |

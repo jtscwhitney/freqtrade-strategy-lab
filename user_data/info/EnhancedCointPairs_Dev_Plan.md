@@ -23,6 +23,7 @@ This is Candidate L in our Research Log. A co-developer project running in paral
 - **V02 (`EnhancedCointPairsStrategy_V02`) — β-churn entry filter:** Skips entries when rolling mean `|Δβ|` over `beta_churn_window` exceeds `beta_churn_max` (defaults **12** bars / **0.0085**). Both are **`space="buy"`** hyperopt parameters. Tracked default sidecar: `user_data/strategy_params/EnhancedCointPairsStrategy_V02_defaults.json`. Full-sample defaults **beat V01** on total return (**~+27.7%** vs **~+25.7%**) and flip **2023** from slightly negative to **~+3.6%**; **2022** is worse than V01 (**~−0.5%** vs **~+8.4%**) — explicit trade-off. CSV: `user_data/results/cointpairs_walk_forward_v02.csv`.
 - **β-churn grid (soften 2022 vs keep 2023/2024):** `python user_data/scripts/cointpairs_beta_churn_sweep.py` — sweeps `beta_churn_max` (and optionally `beta_churn_window` with `--sweep-window`) → `user_data/results/cointpairs_beta_churn_sweep.csv`. Example: `--quick` (2024 + 2025–26 only) or full calendar windows.
 - **BTC/PAXG (gold proxy, lab):** `config/config_cointpairs_l_phase1_btc_paxg.json` — `traded` **BTC/USDT:USDT**, `anchor` **PAXG/USDT:USDT** (Binance USDT-M perp; listing ~Mar 2025 — **no** meaningful 4h history before that). Use timerange **`20250301–20260331`** (or later OOS) for backtests; full-sample walk-forward windows that start in 2022–2024 are **not** comparable for this pair. Summary metrics: `user_data/results/cointpairs_btc_paxg_backtest_summary.txt`. **Deploy / droplets:** lab-only until results justify a fourth process — see Deep Dive Part 3.
+- **LINK/ETH, UNI/SOL, XMR/BTC (exploratory, 2026-04-03):** Backtests run from **`freqtrade-coint-pairs-trading`** (same image/strategy as droplets): **`config_cointpairs_l_phase1_link_eth.json`**, **`config_cointpairs_l_phase1_uni_sol.json`**, **`config_cointpairs_l_phase1_xmr_btc.json`**. **`EnhancedCointPairsStrategy_V01`** @ **4h**, defaults, **`--timerange 20220101-20260403`**, **`-i 4h --cache none`**. **Results:** LINK/ETH **≈ −59%** PF **0.68** — skip. XMR/BTC **≈ −51%** PF **0.78** — skip. UNI/SOL **≈ +22%** PF **1.03** but **large drawdown** and **catastrophic stop/liq** tail events — **do not** add droplet instances without further work. Full table and rationale: **`EnhancedCointPairs_Deep_Dive.md` Part 3**.
 - **Lever sweep (entry/exit/z/ols/churn, V01, V02@1h, extra GO pairs):** `python user_data/scripts/cointpairs_lever_sweep.py` → `user_data/results/cointpairs_lever_sweep.csv`. `--quick` uses 2024 only (fast); default timerange `20220101–20260331`. **Config** `cointpairs.traded` / `cointpairs.anchor` + whitelist drive pair selection (see `config_cointpairs_l_phase1.json`). **Interpret multi-pair rows with care** — some pairs show extreme full-sample P&L vs one-year slice; validate before forward tests.
 - **BNB/SOL deep-dive bundle (preserved):** `user_data/results/cointpairs_bnb_sol_4h_analysis/` — params + config snapshots, `SUMMARY.txt`, Freqtrade `backtest-result-*.zip` (trades export), `RUN_MANIFEST.md` for reproduction. Use for detailed analysis; do not rely on a stray `EnhancedCointPairsStrategy_V02.json` in `strategies/` (removed after snapshot; restore from `strategy_params_snapshot.json` if needed).
 - **Hyperopt V02 (do not pass `--cache` to hyperopt):** `docker compose run --rm freqtrade hyperopt --config /freqtrade/config/config_cointpairs_l_phase1.json --strategy EnhancedCointPairsStrategy_V02 --hyperopt-loss SharpeHyperOptLoss --spaces buy sell --epochs 50 --timerange 20220101-20241231 --min-trades 15`
@@ -347,6 +348,9 @@ This yields **45 unique pairs** for cointegration screening. Not all will be coi
 | `user_data/results/cointpairs_walk_forward_v01_default_vs_hyperopt.csv` | Default vs hyperopt V01 | **Updated** |
 | `config/config_cointpairs_l_phase1.json` | BTC+ETH only, Phase 1 backtest | **Built** |
 | `config/config_cointpairs_v2.json` | 10-asset download / future multi-pair | **Built** (Phase 0 data) |
+| `freqtrade-coint-pairs-trading/config/config_cointpairs_l_phase1_link_eth.json` | LINK/ETH exploratory backtest (deploy repo) | **Built** — not wired in `docker-compose` |
+| `freqtrade-coint-pairs-trading/config/config_cointpairs_l_phase1_uni_sol.json` | UNI/SOL exploratory backtest (deploy repo) | **Built** — not wired in `docker-compose` |
+| `freqtrade-coint-pairs-trading/config/config_cointpairs_l_phase1_xmr_btc.json` | XMR/BTC exploratory backtest (deploy repo) | **Built** — not wired in `docker-compose` |
 | `user_data/scripts/cointpairs_phase0_validation.py` | **EXISTING** Phase 0 pipeline (v4) — adapt for 1h and dual-leg fee calc | Reuse + adapt |
 | `user_data/strategies/CointPairsStrategy_V02.py` | **EXISTING** F's single-leg strategy — reference only | Reference |
 | `user_data/info/EnhancedCointPairs_Dev_Plan.md` | THIS FILE (canonical); mirrored in deploy repo | Active |
@@ -395,6 +399,7 @@ This yields **45 unique pairs** for cointegration screening. Not all will be coi
 - `config_cointpairs_l_phase1.json` — traded/anchor BTC / ETH  
 - `config_cointpairs_l_phase1_bnb_sol.json` — BNB / SOL  
 - `config_cointpairs_l_phase1_btc_sol.json` — BTC / SOL  
+- **Exploratory (backtest reproduction only; not compose services):** `config_cointpairs_l_phase1_link_eth.json`, `config_cointpairs_l_phase1_uni_sol.json`, `config_cointpairs_l_phase1_xmr_btc.json` — see Quick-Start bullet *LINK/ETH, UNI/SOL, XMR/BTC* and Deep Dive Part 3.
 
 **V01** in the deploy repo matches the lab’s dual-leg logic but reads **`cointpairs`** from config (required for the three spreads). **`dry_run`** defaults true in templates; add Binance API keys before live trading.
 
@@ -442,4 +447,4 @@ J and L are designed to be **uncorrelated and concurrent:**
 ---
 
 *Document maintained by: Claude + co-developer*  
-*Last updated: 2026-04-02 — Added Part 6 deploy repo (`freqtrade-coint-pairs-trading`), DigitalOcean two-droplet layout, mirror path; Phase 3 and architecture aligned with production.*
+*Last updated: 2026-04-03 — Documented LINK/ETH, UNI/SOL, XMR/BTC exploratory V01@4h backtests (deploy repo configs); droplet decision: no new instances on these results.*
