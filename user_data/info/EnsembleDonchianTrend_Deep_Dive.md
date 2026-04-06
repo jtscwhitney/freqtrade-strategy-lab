@@ -1,5 +1,5 @@
 # Ensemble Donchian Trend-Following (Candidate J) — Deep Dive
-## Version 1.0 | Started: 2026-03-31 | Status: **PRE-DEVELOPMENT** — Phase 0 not yet started.
+## Version 1.5 | Started: 2026-03-31 | Status: **PARKED (2026-04-06)** — Phase 0 **NO-GO**; MVP and docs **retained for reference** only. Do not extend unless reopened as a **new hypothesis** with a fresh Phase 0 charter (see `AlgoTrading_Research_Log.md`).
 
 ---
 
@@ -13,19 +13,18 @@
 
 | Item | State |
 |------|--------|
-| **Phase 0** | **Not started** — data download + hourly timeframe validation + fee-inclusive parameter sweep |
-| **Phase 1** | Pending Phase 0 GO — Freqtrade MVP implementation |
-| **Phase 2** | Pending Phase 1 GO — Enhancement (K-filter), hyperopt, OOS validation |
-| **Phase 3** | Pending Phase 2 GO — Dry-run deployment |
+| **Phase 0** | **CLOSED — NO-GO (2026-04-06)** — Fee-inclusive backtests and `donchian_phase0_sweep.py` grid failed Dev Plan economics / robustness gates. Representative artifact: `user_data/results/donchian_phase0_sweep_20260406_105346.md`. |
+| **Phase 1** | **MVP frozen** — `EnsembleDonchianStrategy_V01.py` / `V02` / variants, `config_donchian.json` (14 pairs). **No further product work** unless Research Log **reopens** J. |
+| **Phase 2–3** | **Cancelled** for this candidate (no Phase 0 GO). |
 
 ### Primary Risk
 
-The source paper (Zarattini et al., SSRN 2025) uses **daily** data. Our frequency objective requires **hourly**. Phase 0 must explicitly validate that the ensemble signal retains predictive power at 1h resolution before any Freqtrade code is written. If 1h fails, test 4h as a fallback. If both fail, STOP.
+The source paper uses **daily** bars for the Donchian ensemble. The MVP computes the **nine daily lookbacks on 1d OHLCV** and merges them onto the **1h** dataframe for entries, sizing, and stops (signal updates daily, ffill on 1h; fills on 1h). **Phase 0 (closed 2026-04-06)** ran fee-inclusive sweeps across thresholds, trailing methods, **V01 vs V02**, lookback ablation, and `max_open_trades` — **no operating point** cleared project gates. A **pure 8640×1h** Donchian on all nine windows is **not supported** on stock Freqtrade + Binance because of the **startup candle / API chunk limit** (~2494 one-hour bars); **`1d` informative** was the supported implementation path for full paper horizons.
 
 ### Key Commands (PowerShell-friendly, single lines)
 
 ```text
-docker compose run --rm freqtrade download-data --config /freqtrade/config/config_donchian.json --timerange 20220101-20260401 --timeframes 1h
+docker compose run --rm freqtrade download-data --config /freqtrade/config/config_donchian.json --timerange 20220101-20260401 --timeframes 1h 1d --trading-mode futures
 ```
 
 ```text
@@ -36,23 +35,30 @@ docker compose run --rm --entrypoint python freqtrade user_data/scripts/donchian
 docker compose run --rm freqtrade backtesting --config /freqtrade/config/config_donchian.json --strategy EnsembleDonchianStrategy_V01 --timerange 20220101-20260101 --timeframe 1h --fee 0.0005 --export trades
 ```
 
+Phase 0 parameter grid (writes `user_data/results/donchian_phase0_sweep_<timestamp>.json` + `.md`; use `--entrypoint python` so runs call `freqtrade` directly):
+
+```text
+docker compose run --rm --entrypoint python freqtrade user_data/scripts/donchian_phase0_sweep.py
+```
+
 ### File Locations
 
 | File | Status | Purpose |
 |------|--------|---------|
-| `user_data/info/EnsembleDonchianTrend_Deep_Dive.md` | **THIS FILE** | Authoritative technical + layman reference for Candidate J |
-| `user_data/info/EnsembleDonchianTrend_Dev_Plan.md` | Active | Phase gates, go/no-go criteria, anti-pattern table |
-| `user_data/strategies/EnsembleDonchianStrategy_V01.py` | To build (Phase 1) | Long-only ensemble Donchian MVP |
-| `config/config_donchian.json` | To build (Phase 0) | 20-pair futures whitelist, fees, leverage |
-| `user_data/scripts/donchian_phase0_sweep.py` | To build (Phase 0) | Signal validation + fee-inclusive parameter sweep |
-| `user_data/info/AlgoTrading_Research_Log.md` | Active | Candidate J evaluation (7/7), priority ranking, sweep log |
+| `user_data/info/EnsembleDonchianTrend_Deep_Dive.md` | **THIS FILE** | Technical + layman reference; candidate **PARKED** — read §Quick-Start status first |
+| `user_data/info/EnsembleDonchianTrend_Dev_Plan.md` | **PARKED** (reference) | Phase gates, go/no-go criteria, anti-pattern table |
+| `user_data/strategies/EnsembleDonchianStrategy_V01.py` | **Built** | V01 + `_ATR` + entry-threshold + lookback-ablation subclasses |
+| `user_data/strategies/EnsembleDonchianStrategy_V02.py` | **Built** | Pure `1d` execution (same lookbacks; `startup_candle_count` 0 for short on-disk spans) |
+| `config/config_donchian.json` | **Built** | **14-pair** futures whitelist (pairs with Binance USDT-M history from **2022-01-01**; late-listed alts removed so 1d lookbacks align across the universe), `max_open_trades` 5, API 8085 |
+| `user_data/scripts/donchian_phase0_sweep.py` | **Built** | Docker-aware grid of backtests → `user_data/results/donchian_phase0_sweep_*.json`/`.md` |
+| `user_data/info/AlgoTrading_Research_Log.md` | Active | Registry; **J PARKED** §4.3–4.4; 7/7 filter note ≠ Phase 0 GO; sweep log |
 
 **Reusable from Candidate G:**
 
 | File | Reuse How |
 |------|-----------|
 | `user_data/strategies/XSMomentumStrategy_V01.py` | Reference for `DataProvider` cross-pair pattern, `custom_info` storage, `custom_stake_amount()` vol-scaling |
-| `config/config_xsmom.json` | Reference for 22-pair StaticPairList structure, fee settings, leverage config |
+| `config/config_xsmom.json` | Reference for StaticPairList structure, fee settings, leverage config (J uses a **smaller** whitelist than G) |
 | `user_data/scripts/xsmom_phase0_exploration.py` | Reference for Phase 0 sweep script structure |
 
 ---
@@ -61,7 +67,7 @@ docker compose run --rm freqtrade backtesting --config /freqtrade/config/config_
 
 ### 1.1 One-sentence idea
 
-**Buy any crypto that is hitting new highs across multiple time horizons at once, and ride the trend until it breaks — using a basket of ~20 coins so there's always something trending somewhere.**
+**Buy any crypto that is hitting new highs across multiple time horizons at once, and ride the trend until it breaks** — using a basket of ~14 liquid futures pairs (whitelist in `config_donchian.json`) so exposure is diversified.
 
 That's **ensemble trend-following**: the word "ensemble" means we're not asking "is this coin at a 20-day high?" — we're asking "is this coin at a 5-day high *and* a 20-day high *and* a 90-day high *and* a 250-day high... all at the same time?" The more time horizons agree, the more confident we are that a real trend is underway, not just noise.
 
@@ -116,10 +122,10 @@ J and LiqCascade are designed to **diversify how the book makes money**, not rep
 
 ## Part 2: Plain English — How the Bot Will Think
 
-Imagine watching **20 runners** on a track. Every hour:
+Imagine watching **14 runners** (our current futures whitelist) on a track. **Once per day** (when the daily candle closes), for each runner:
 
-1. For each runner, draw **9 "highest point" lines** — one for the last 5 days, one for the last 10 days, one for the last 20 days, and so on up to the last 360 days. Each line represents the highest point that runner reached during that lookback window.
-2. Check: **is the runner currently above each line?** If yes, that's a "breakout vote" for that time horizon. If no, no vote.
+1. Draw **9 "highest point" lines** — one for the last 5 days, one for the last 10 days, one for the last 20 days, and so on up to the last **360 calendar days**. Each line uses **daily** highs and lows (same as the paper). Between daily updates, the bot **reuses the last completed day’s** ensemble values on each **hour** (no intraday change to the Donchian votes).
+2. Check: **is the runner’s daily close above each line?** If yes, that's a "breakout vote" for that horizon. If no, no vote.
 3. **Count the votes.** If a runner is above 7 out of 9 lines (score = 0.78), they're in a strong trend across almost all time horizons. If they're above 2 out of 9 (score = 0.22), they might have a short-term bounce but aren't in a real trend.
 4. **Bet on runners scoring above the threshold** (e.g., > 0.5 — majority of horizons confirm trend). The higher the threshold, the more selective we are (fewer trades, higher confidence per trade).
 5. **Size each bet** based on how volatile each runner has been recently — bet less on the wild ones, more on the steady ones. (In technical terms: inverse-volatility position sizing.)
@@ -136,33 +142,37 @@ Imagine watching **20 runners** on a track. Every hour:
 ┌──────────────────────────────────────────────────────────────────────┐
 │           ENSEMBLE DONCHIAN TREND-FOLLOWING (Candidate J)             │
 ├──────────────────────────────────────────────────────────────────────┤
-│  Inputs: Binance USDT-M futures OHLCV, 1h candles                    │
-│  Universe: ~20 liquid pairs (StaticPairList in config_donchian)      │
+│  Inputs: Binance USDT-M futures OHLCV — **1d** (Donchian) + **1h**   │
+│          (volatility, ATR, order timing)                              │
+│  Universe: **14** liquid pairs (StaticPairList in config_donchian)   │
 │                                                                      │
-│  For each pair's dataframe (Freqtrade calls populate_indicators):    │
-│    • Compute Donchian upper/lower at 9 lookback periods              │
-│    • Binary breakout signal per lookback: close > upper ? 1 : 0      │
-│    • Ensemble score = mean of 9 binary signals (0.0 to 1.0)         │
-│    • Trailing stop level = Donchian lower band (shortest active)     │
-│    • Asset volatility = rolling std for position sizing              │
+│  For each pair (populate_indicators):                                 │
+│    • Load **1d** series; compute Donchian upper/lower at **9 paper**  │
+│      lookbacks: **5,10,20,30,60,90,150,250,360** calendar days       │
+│    • merge_informative_pair(1h, 1d) — **no lookahead** (daily bar   │
+│      aligned per Freqtrade rules)                                     │
+│    • Binary breakout per lookback: daily close > prior daily upper    │
+│    • Ensemble score = mean of 9 signals (0.0–1.0), ffill on 1h rows │
+│    • Trailing stop = **daily** Donchian lower for shortest active N  │
+│    • Vol for sizing = **1h** rolling std of returns (168-bar window) │
+│    • ATR(14) on **1h** if using ATR trailing variant                 │
 │                                                                      │
-│  Entries: enter_long when ensemble_score > threshold                 │
-│           (threshold is a hyperparameter, default 0.5)               │
-│  Exits: custom_stoploss trailing at Donchian lower band              │
-│         OR ATR-based trailing stop (test both in Phase 0)            │
-│         Time stop as backup safety net                               │
+│  Entries: enter_long when ensemble_score > threshold (default 0.5)   │
+│  Exits: custom_stoploss (Donchian lower or ATR) + hard stop + time   │
 │                                                                      │
 │  Position sizing: custom_stake_amount with inverse-vol scaling       │
-│  Direction: LONG ONLY. No short entries.                             │
+│  Direction: LONG ONLY.                                                │
 │                                                                      │
-│  No sidecar. No FreqAI. No ML. Pure price channels.                 │
-│  Reuses G's DataProvider cross-pair pattern + vol-scaling logic.     │
+│  No sidecar. No FreqAI. No ML. Pure price channels.                   │
+│  Reuses G’s DataProvider cross-pair pattern for vol scaling.          │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**Caching consideration:** Unlike G which needed cross-sectional ranking (all pairs compared each candle), J computes signals per-pair independently. No cross-pair comparison is needed for the core signal — each pair's ensemble score depends only on its own price history. The `DataProvider` pattern from G is still useful for loading universe data and computing cross-sectional volatility for position sizing, but the signal logic itself is simpler.
+**Caching consideration:** Unlike G which needed cross-sectional ranking (all pairs compared each candle), J computes Donchian signals **per pair** on **1d** data. Cross-pair loading is only for **inverse-vol** denominators (median vol across the whitelist).
 
-**Startup candles:** The longest Donchian lookback is 8640 hours (360 days). For a 1h backtest, this means the first 8640 candles cannot compute the full ensemble. Options: (a) set `startup_candle_count = 8640` — wastes almost a year of data, (b) use a partial ensemble (only the lookbacks that have enough data) during the warmup period, (c) **reduce the longest lookback** if Phase 0 shows it adds minimal value at hourly resolution. Option (c) is likely the right answer — Phase 0 should test whether a 5-lookback subset (up to 2160h = 90 days) is sufficient.
+**Why not nine channels on raw 1h bars out to 360 days?** On Binance, Freqtrade caps how many **1h** candles can be loaded at strategy startup (~**2494** bars from the exchange chunk rule). That caps the longest **hourly** Donchian at roughly **~100 days**, not 360. Implementing the paper’s **360-day** horizon therefore uses **`1d` informative candles** for Donchian math; **`startup_candle_count` on the strategy stays modest (~400)** because it only warms up **1h** indicators (vol, ATR), not 8640 hourly Donchian bars.
+
+**Whitelist note:** Pairs listed on Binance **after** 2022-01-01 were removed so every symbol has the same **1d** history anchor; otherwise the “universe” would be limited by the **newest** listing date.
 
 ---
 
@@ -193,25 +203,22 @@ We compare the current close to the *previous candle's* upper band to avoid look
 ensemble_score(t) = (1/K) × Σ signal_i(t)    for i = 1 to K
 ```
 
-where `K` is the number of lookback periods (9 in the paper, possibly fewer at hourly resolution). The result is a value between 0.0 and 1.0.
+where `K` is the number of lookback periods (**9** in the paper and in **V01**). The result is a value between 0.0 and 1.0.
 
-### 4.4 Lookback period mapping (paper daily → our hourly)
+### 4.4 Lookback periods (paper = implementation)
 
-The Zarattini paper uses daily bars with these lookback periods:
+The Zarattini paper uses **daily** bars with **calendar-day** lookbacks. **V01 implements these directly on the `1d` timeframe** (not ×24 hourly bars):
 
-| Paper (daily bars) | Hourly Equivalent (×24) | Approximate Calendar Duration | Notes |
-|---|---|---|---|
-| 5d | 120h | ~1 week | Fastest — catches short-term breakouts but most prone to noise |
-| 10d | 240h | ~2 weeks | |
-| 20d | 480h | ~1 month | Classic "Turtle" lookback |
-| 30d | 720h | ~1 month | |
-| 60d | 1440h | ~2 months | |
-| 90d | 2160h | ~3 months | Quarter boundary |
-| 150d | 3600h | ~6 months | Requires 6 months of data to compute |
-| 250d | 6000h | ~10 months | Requires 10 months — **may not add value at hourly resolution** |
-| 360d | 8640h | ~1 year | Requires 1 year — **likely redundant at hourly; test in Phase 0** |
+| Lookback (days) | Role | Notes |
+|---|---|---|
+| 5, 10 | Short horizon | Fastest to flip; more noise |
+| 20, 30 | Medium | Classic Turtle-ish windows |
+| 60, 90 | Medium-long | Quarter-scale context |
+| 150, 250, 360 | Long | Slow trend confirmation; 360d ≈ one year |
 
-**Phase 0 must determine:** Do all 9 lookbacks add value at hourly resolution, or does a subset (e.g., 120h through 2160h — the first 6) perform equally well? Longer lookbacks require more startup data and are computationally heavier, so eliminating the longest ones without performance loss is desirable.
+**Merged to 1h:** After computing signals on `1d`, Freqtrade’s `merge_informative_pair` attaches them to each **1h** row (forward-filled until the next daily close). Entries and `custom_stoploss` therefore run on **1h** timestamps, but the **Donchian math updates daily**—matching the paper’s bar size, not “9 channels on 1h out to 8640 bars.”
+
+**Phase 0 / research:** Whether to **drop** long windows (e.g. 250d–360d) for simplicity or robustness is now an **empirical** question (ablation on this codebase), not a Freqtrade startup workaround.
 
 ### 4.5 Why the ensemble is more robust than a single lookback
 
@@ -229,7 +236,7 @@ This is why G failed and J may succeed: G used a single formation period (4h or 
 
 ### 5.1 Plain English
 
-Once we're in a trade, we draw a "floor" under the price — the lowest point the asset has reached recently (over the shortest lookback period that triggered our entry). As the trend continues and the price makes new highs, the floor rises with it (because the recent low point keeps getting higher). But the floor **never drops** — it only moves up or stays flat.
+Once we're in a trade, we draw a "floor" under the price — the **daily** Donchian lower band for the **shortest lookback (in days) that was active at entry**. That floor is updated when each **daily** candle completes (and is forward-filled on 1h bars). In implementation the stop **ratchets**: the effective stop price only moves **up**, never down (`custom_stoploss` in V01).
 
 If the price falls and touches this rising floor, we exit. The trend is over.
 
@@ -243,9 +250,9 @@ Two trailing stop approaches to test in Phase 0:
 ```
 trailing_stop_level(t) = DC_lower(t, N_shortest_active)
 ```
-where `N_shortest_active` is the shortest lookback period whose breakout signal was active at entry. This gives the tightest trailing stop — exits quickly when the short-term trend breaks.
+where `N_shortest_active` is the shortest lookback (here **in days**) whose breakout signal was active at entry. This gives the tightest trailing stop — exits when price violates that **daily** lower band (evaluated on 1h bars via merged columns).
 
-Exit when: `close(t) < trailing_stop_level(t)`
+Exit when price hits the stop implied by `DC_lower` (Freqtrade: `custom_stoploss` returns relative stop distance).
 
 **Approach B — ATR-based trailing:**
 ```
@@ -253,14 +260,7 @@ trailing_stop_level(t) = highest_close_since_entry - (ATR_multiplier × ATR(t, 1
 ```
 This trails at a fixed distance (in volatility terms) below the peak price since entry. More conventional, not tied to the Donchian framework.
 
-In Freqtrade, both are implemented via `custom_stoploss()`:
-```python
-def custom_stoploss(self, pair, trade, current_time, current_rate, current_profit, **kwargs):
-    # Look up trailing stop level from self.custom_info
-    # Return negative distance from current_rate
-    stop_level = self.custom_info[pair]['trailing_stop_level']
-    return (stop_level - current_rate) / current_rate  # negative value = distance below current price
-```
+In Freqtrade, V01 implements both via `custom_stoploss()` by reading the latest analyzed **1h** row (`get_analyzed_dataframe`): Donchian variant uses column `dc_lower_{N}` (daily-based, merged); ATR variant uses **1h** `atr` and peak price since open. Per-pair state (`_pair_entry_trail_n`, `_pair_ratched_stop`) stores the entry lookback and ratcheted stop. Return value is a **negative fraction** of current price (stop below market), floored at the hard `stoploss`.
 
 ### 5.3 Time stop (backup)
 
@@ -304,10 +304,10 @@ J is designed for **maximum infrastructure reuse** from the parked Candidate G. 
 
 | Component | G's Implementation | J's Adaptation |
 |---|---|---|
-| `DataProvider` cross-pair loading | `bot_loop_start()` loads all 22 pairs, computes returns, ranks | Same loading pattern; compute Donchian channels instead of returns |
-| `custom_info` storage | Stores cross-sectional ranks per pair per candle | Stores ensemble score + trailing stop level per pair per candle |
-| `custom_stake_amount()` | Inverse-vol scaling with floor at 50% | Identical — reuse directly |
-| `config_xsmom.json` structure | 22-pair StaticPairList, futures mode, fee settings | Copy and rename; update pair list if needed |
+| `DataProvider` cross-pair loading | Loads whitelist pairs, computes returns, ranks | Same idea: load pairs for **median vol**; Donchian signal is **per pair** on `1d` |
+| `custom_info` storage | Stores cross-sectional ranks per pair per candle | J uses **instance dicts** for trail lookback + ratcheted stop (not `custom_info`) |
+| `custom_stake_amount()` | Inverse-vol scaling with floor at 50% | Same pattern — **1h** returns for vol |
+| `config_xsmom.json` structure | Large StaticPairList, futures mode, fee settings | `config_donchian.json`: **14** pairs, same modes/fees philosophy |
 | Phase 0 sweep script pattern | `xsmom_phase0_exploration.py` | Adapt for Donchian signal sweep instead of return-ranking sweep |
 
 ### 7.2 What changes
@@ -337,10 +337,9 @@ A clean implementation from scratch (reusing infrastructure components but not t
 
 | Phase | Goal (layman) | Status |
 |-------|----------------|--------|
-| **0** | "Does the Donchian ensemble signal work at hourly resolution? Is there a profitable operating point after fees?" | **Not started.** The paper uses daily data — hourly is untested. This is the critical gate. |
-| **1** | "Does the signal survive implementation in Freqtrade? Do regime splits confirm robustness?" | Pending Phase 0 GO. |
-| **2** | "Can we improve it with a macro trend filter (Candidate K)? Do optimized parameters hold out-of-sample?" | Pending Phase 1 GO. |
-| **3** | "Does it work in live market conditions alongside LiqCascade?" | Pending Phase 2 GO. |
+| **0** | Fee-inclusive economics + regime robustness | **NO-GO (2026-04-06)** — see `user_data/results/donchian_phase0_sweep_20260406_105346.md`. |
+| **1** | MVP fidelity | **Frozen** — sufficient to conclude Phase 0; no hyperopt warranted. |
+| **2–3** | K-filter / live | **Cancelled** while candidate is PARKED. |
 
 Exact numeric gates for each phase are in `EnsembleDonchianTrend_Dev_Plan.md`.
 
@@ -348,23 +347,27 @@ Exact numeric gates for each phase are in `EnsembleDonchianTrend_Dev_Plan.md`.
 
 ## Part 9: Strategy Variants (Planned)
 
-**Module (to build):** `user_data/strategies/EnsembleDonchianStrategy_V01.py`
+**Module:** `user_data/strategies/EnsembleDonchianStrategy_V01.py` (+ `EnsembleDonchianStrategy_V01_ATR`).
 
 ### V01 — MVP (Phase 1)
 
 | Parameter | Default | Range to Test |
 |---|---|---|
-| `LOOKBACK_PERIODS` | `[120, 240, 480, 720, 1440, 2160, 3600, 6000, 8640]` | Phase 0 will determine if subset is sufficient |
+| `DONCHIAN_TIMEFRAME` | `'1d'` | Fixed — required for full 360d lookback under Binance startup rules |
+| `LOOKBACK_DAYS` | `(5, 10, 20, 30, 60, 90, 150, 250, 360)` | Ablation: drop long tails (e.g. 250–360) vs full paper set |
+| `timeframe` (base) | `1h` | Alternative research: `1d`-only strategy (different execution model) |
+| `startup_candle_count` | `400` | Warm-up for **1h** vol/ATR only; raise only if vol window grows |
 | `ENTRY_THRESHOLD` | 0.5 | 0.3, 0.5, 0.7, 0.9 (Phase 0 sweep) |
-| `TRAILING_STOP_METHOD` | `'donchian_lower'` | `'donchian_lower'` vs `'atr'` (Phase 0 comparison) |
-| `TRAILING_STOP_LOOKBACK` | shortest active | shortest vs median active lookback |
+| `TRAILING_STOP_METHOD` | `'donchian_lower'` | `'donchian_lower'` vs `'atr'` (`_V01_ATR` class) |
+| `TRAILING_STOP_LOOKBACK` | shortest active at entry | shortest vs median active lookback (future variant) |
 | `ATR_MULTIPLIER` (if ATR method) | 3.0 | 2.0, 3.0, 4.0 |
-| `VOL_SCALING_WINDOW` | 168 (7d) | Fixed for V01 |
-| `VOL_SCALING_FLOOR` | 0.5 | Fixed for V01 |
-| `MAX_OPEN_TRADES` | 5 | 5–8 depending on how many pairs are in breakout simultaneously |
-| `LEVERAGE` | 2 | Fixed for V01 |
-| `TIME_STOP_HOURS` | 720 (30d) | Safety net; should rarely fire |
-| `stoploss` | -0.12 | Fixed hard stop as catastrophic protection |
+| `VOL_SCALING_WINDOW` | 168 (7d of 1h) | Fixed for V01 |
+| `VOL_SCALING_FLOOR` / `CAP` | 0.5 / 2.0 | Fixed for V01 |
+| `MAX_OPEN_TRADES` | 5 | 5–10 vs **14** pairs — capacity study |
+| `LEVERAGE` | 2 (capped in strategy) | Fixed for V01 |
+| `TIME_STOP_HOURS` | 720 (30d) | Safety net; diagnostic if rate high |
+| `stoploss` | -0.12 | Hard catastrophic cap |
+| Whitelist | **14** pairs | See `config_donchian.json`; expand only if **common 1d** history exists |
 
 **Backtest fee:** `--fee 0.0005` (5 bps per side; ~10 bps round trip).
 
@@ -374,34 +377,29 @@ Same as V01 plus a **multi-timeframe trend confirmation filter** (from Candidate
 - Require a higher-timeframe indicator (e.g., daily MACD or 4h EMA200 direction) to confirm the trend direction before entry
 - This addresses Lesson #4 (short-term indicators lie in macro trends) — prevents entering Donchian breakouts that are counter to the larger trend
 - If V01 shows excessive entries during counter-trend periods (identifiable via regime-split analysis), V02 adds this filter
-- Implementation: `informative_pairs()` adds daily timeframe for the macro indicator; `populate_entry_trend()` requires both ensemble score > threshold AND macro trend confirmation
+- Implementation note: V01 **already** uses `informative_pairs()` for **`1d` Donchian**. V02 adds a **second** daily (or 4h) **macro** filter column and ANDs it with `ensemble_score` in `populate_entry_trend()`.
 
 ---
 
 ## Part 10: Key Technical Decisions to Resolve in Phase 0
 
-These are open questions that Phase 0 must answer before any Freqtrade code is written:
+MVP code **exists**; **Phase 0 is closed (NO-GO 2026-04-06)** — this section is **archived design intent**; reopen only with a new hypothesis charter.
 
-### 10.1 How many lookback periods at hourly resolution?
+### 10.1 How many daily lookbacks?
 
-The paper uses 9 lookbacks (5d to 360d). At hourly resolution, the longest (8640h) requires a year of data just to start computing. Phase 0 should test:
-- Full 9-lookback ensemble at 1h
-- 6-lookback subset (120h to 2160h — drops the three longest)
-- 5-lookback subset (120h to 1440h — drops the four longest)
-
-If performance is similar with fewer lookbacks, use fewer. Less data required, less startup waste, simpler computation.
+The paper uses **9** lookbacks (5d–360d); V01 implements all nine on **`1d`**. **Phase 0** included **lookback ablation** (`_LookbackAblated`); it did **not** produce a gate-clearing operating point.
 
 ### 10.2 Donchian trailing stop vs ATR trailing stop?
 
-Donchian lower band trailing is more theoretically coherent (the exit is from the same framework as the entry). ATR trailing is more conventional and may be easier to calibrate. Phase 0 should test both on the same dataset and compare profit factor, average hold duration, and max drawdown.
+Donchian lower band trailing is more theoretically coherent (the exit is from the same framework as the entry). ATR trailing is more conventional and may be easier to calibrate. **Phase 0** compared both on the same fee-inclusive sample; **neither** combination cleared project gates — see `user_data/results/donchian_phase0_sweep_*.md`.
 
-### 10.3 Does the signal work at 1h at all?
+### 10.3 Execution timeframe vs signal timeframe
 
-The hardest question. Trend-following systems typically use daily or weekly data. Hourly data has more noise. The ensemble may smooth out enough noise to work, or it may not. If the Phase 0 sweep shows no profitable operating point at 1h, try 4h before abandoning. If 4h also fails, the strategy may be fundamentally a slow-frequency one — in which case it conflicts with our active-trading objective and should not be pursued.
+The **signal** is **daily** (paper-aligned). **Orders** still fill on **1h** candles in V01. **Phase 0** compared **hybrid 1d-signal / 1h-exec** (V01) vs **pure `1d`** (V02); economics remained **below gates** on the grid tested. True “all Donchian channels on 1h out to one year” remains **infeasible** on stock Freqtrade + Binance without custom data loading.
 
 ### 10.4 Entry threshold calibration
 
-Higher threshold (e.g., 0.9 — only enter when 8+ of 9 lookbacks agree) produces fewer, higher-confidence entries. Lower threshold (e.g., 0.3) produces more entries but with lower per-trade confidence. Phase 0 should sweep this and plot the tradeoff between trade frequency and per-trade profitability. Our objective wants **both** high frequency and high per-trade edge — the sweep will show where the frontier is.
+Higher threshold (e.g., 0.9 — only enter when 8+ of 9 lookbacks agree) produces fewer, higher-confidence entries. Lower threshold (e.g., 0.3) produces more entries but with lower per-trade confidence. **Phase 0** swept thresholds **0.3–0.9**; **no** point on that frontier cleared gates **fee-inclusive** on the 2022–2026 sample exercised in the sweep.
 
 ---
 
@@ -409,32 +407,32 @@ Higher threshold (e.g., 0.9 — only enter when 8+ of 9 lookbacks agree) produce
 
 | Lesson | What It Means | Application in J |
 |--------|---------------|------------------|
-| **#2:** Entry quality > exit optimization (RAME) | If the base signal has no edge, no exit tuning will fix it. | Phase 0 validates signal quality before building exits. |
+| **#2:** Entry quality > exit optimization (RAME) | If the base signal has no edge, no exit tuning will fix it. | **Phase 0 outcome:** entry / regime economics **did not** clear gates — candidate **PARKED**; no further exit hyperopt until a **new entry hypothesis** is chartered. |
 | **#3:** Structural alpha > statistical alpha (RAME→LiqCascade) | Prefer signals with a clear *why*. | Trend-following has 40+ years of *why*: serial correlation, behavioral momentum, reflexive feedback loops. Structural, not statistical. |
 | **#4:** Short-term indicators lie in macro trends (RAME) | Any short-term signal needs a macro filter. | V02 adds Candidate K's multi-timeframe macro filter. V01 relies on the ensemble's long lookbacks as implicit macro context. |
-| **#7:** Fee economics before infrastructure (LOB) | Validate fee-inclusive profitability before building. | Phase 0 Day 2 is a fee-inclusive sweep. No Freqtrade code until sweep passes. |
+| **#7:** Fee economics before infrastructure (LOB) | Validate fee-inclusive profitability before scaling effort. | Phase 0: fee-inclusive sweeps and regime splits **before** hyperopt / live. |
 | **#8:** Paper results don't transfer to our fee tier (LOB) | Always compute P&L at our actual fees. | All backtests use `--fee 0.0005` (our Binance retail tier). |
-| **#9:** Half-life must match trading frequency (CointPairs) | Don't build a strategy whose natural timescale doesn't match your trading frequency. | Phase 0 explicitly checks whether the signal works at 1h. If it only works at daily, we don't force it. |
+| **#9:** Half-life must match trading frequency (CointPairs) | Don't build a strategy whose natural timescale doesn't match your trading frequency. | Donchian votes are **daily**; execution is **1h** — **Phase 0 tested** hybrid vs pure **`1d`**; result **NO-GO** on project gates (reopen only under a new hypothesis). |
 | **#10:** Bull-market bias (CointPairs) | Don't validate only on bull periods. | Regime splits (2022 bear, 2023 range, 2024–2025 bull) mandatory at every gate. |
-| **#11:** Time-stop rate as diagnostic (LiqCascade) | If > 50% of trades exit via time stop, the entry signal is too loose. | Time stop is a backup safety net. If it fires > 30%, raise the entry threshold. |
-| **#12:** Unhedged directional alt exposure is dangerous (Candidate E) | Don't bet big on single alts without risk controls. | Long-only across 20 pairs with inverse-vol sizing diversifies away single-asset concentration. |
+| **#11:** Time-stop rate as diagnostic (LiqCascade) | If > 50% of trades exit via time stop, the entry signal is too loose. | Time stop is a backup safety net; **if reopened**, use time-stop share as a diagnostic alongside the Phase 0 sweep style grids. |
+| **#12:** Unhedged directional alt exposure is dangerous (Candidate E) | Don't bet big on single alts without risk controls. | Long-only across **14** pairs with inverse-vol sizing diversifies single-asset concentration. |
 | **G's parking lesson:** Single formation period is regime-fragile | One lookback = one point of failure. | Ensemble over 9 lookbacks hedges regime sensitivity. This is J's raison d'être. |
 
 ---
 
 ## Part 12: Risk Factors and What Could Go Wrong
 
-### 12.1 The signal doesn't compress to hourly (PRIMARY RISK)
+### 12.1 Hybrid daily signal + hourly execution (PRIMARY RISK)
 
-Trend-following is traditionally a slow-frequency strategy (daily/weekly). The Zarattini paper uses daily data. If the Donchian breakout signal is too noisy at hourly resolution, the ensemble may generate false breakouts that get stopped out before the trend develops. Phase 0 is designed to catch this early.
+V01 updates Donchian votes **once per day** while reacting to stops/fills **every hour**. That can **help** (finer exits) or **hurt** (more fee churn vs a pure daily system). **Phase 0** ran regime-split + threshold + trailing + `max_open_trades` grids; economics stayed **below gates**. If the candidate is **reopened**, separate **hypotheses** (new universe, different fee/stake model, macro filter / Candidate K overlay) need explicit charters — not more of the same grid without a theory change.
 
-**Mitigation:** Test 4h as a fallback. If even 4h fails, accept that this is a daily-frequency strategy and evaluate whether the trade frequency (with 20 pairs) is sufficient at daily to meet our objectives.
+**Historical mitigation explored:** Regime splits; threshold sweep; `EnsembleDonchianStrategy_V01_ATR`; **`timeframe = 1d`** (V02); lookback ablation.
 
 ### 12.2 Momentum crash
 
 A sudden, violent reversal wipes out weeks of gains in a day. This is the canonical risk of all trend-following strategies. Grobys (2025) documents severe momentum crashes in crypto specifically.
 
-**Mitigation:** Inverse-vol position sizing (underweights the most crash-prone assets), Donchian trailing stop (exits when trend breaks), 20-pair diversification (single crash doesn't dominate), 2x leverage cap (limits tail risk).
+**Mitigation:** Inverse-vol position sizing (underweights the most crash-prone assets), Donchian trailing stop (exits when trend breaks), **14-pair** diversification (single crash doesn't dominate), 2x leverage cap (limits tail risk).
 
 ### 12.3 Donchian is too well-known
 
@@ -455,7 +453,12 @@ If many trend-followers use similar trailing stops, a trend break could trigger 
 | Date | Change |
 |------|--------|
 | 2026-03-31 | v1.0 — Initial Deep Dive: full layman + technical coverage. Architecture, Donchian channel explanation, ensemble mechanics, exit mechanism, position sizing, G relationship analysis, phase history, technical decisions for Phase 0, risk factors. Pre-development — no implementation yet. |
+| 2026-04-06 | v1.1 — Phase 1 MVP: `EnsembleDonchianStrategy_V01` / `_V01_ATR`, `config_donchian.json`. Doc file table + status updated. |
+| 2026-04-06 | v1.2 — **Full paper lookbacks on `1d`** merged to **`1h`**; **14-pair** whitelist (common history from 2022-01-01); Binance **startup / 8640×1h** limitation documented; Phase 0/8/9/10/12 refreshed; V02 informative note clarified. |
+| 2026-04-06 | v1.3 — **`donchian_phase0_sweep.py`**, **`EnsembleDonchianStrategy_V02`** (pure `1d`), threshold + lookback-ablation subclasses on V01; Dev Plan aligned. Sweep artifacts under `user_data/results/donchian_phase0_sweep_*.md`. |
+| 2026-04-06 | v1.4 — **PARKED**: Phase 0 NO-GO; Quick-Start + file table + footer aligned; no forward phases. |
+| 2026-04-06 | v1.5 — Archival pass: Part 10–12 and Lessons table use **closed Phase 0** language; Research Log row in file table clarifies **7/7 ≠ GO**; pointers to sweep artifacts. |
 
 ---
 
-*Authoritative technical reference for Candidate J. For phase gates and go/no-go criteria, see `EnsembleDonchianTrend_Dev_Plan.md`. For project-wide context, see `AlgoTrading_Research_Log.md`.*
+*Technical reference for **PARKED** Candidate J. Registry and priority: `AlgoTrading_Research_Log.md`. Historical gates: `EnsembleDonchianTrend_Dev_Plan.md`.*

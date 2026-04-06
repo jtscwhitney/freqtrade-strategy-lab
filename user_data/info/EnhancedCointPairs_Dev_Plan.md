@@ -12,7 +12,7 @@
 ### What This Project Is
 We are implementing an enhanced cointegration pairs trading strategy on crypto futures. The core idea: identify pairs of crypto assets whose price ratio is cointegrated (mean-reverting), then trade deviations from equilibrium — go long the underperformer and short the outperformer when the spread widens beyond a z-score threshold, exit when it reverts. This is the same strategy class as our archived Candidate F (CointPairs), but enhanced with two innovations from recent peer-reviewed literature: (1) an **adaptive trailing stop-loss** calibrated to the spread's rolling volatility, and (2) a **volatility filter** that suppresses entries during high-vol regimes. These directly address the two failure modes that killed F.
 
-This is Candidate L in our Research Log. A co-developer project running in parallel with Candidate J (Ensemble Donchian Trend-Following).
+This is Candidate L in our Research Log. **Candidate J (Ensemble Donchian) was PARKED 2026-04-06 (Phase 0 NO-GO);** L remains **active** and is **elevated in §4.4** as the top paper-queue strategy candidate.
 
 ### Current Phase
 - **Phase:** 1 — Dual-leg Freqtrade implementation (focused on best Phase 0 pair first)
@@ -44,7 +44,7 @@ This is Candidate L in our Research Log. A co-developer project running in paral
 - Our objective is high-ROI, high-frequency crypto trading. See Research Log Section 2.
 - **CointPairs (Candidate F) was ARCHIVED** after Phase 1 FAIL. Two independent failure modes: (1) single-leg directional exposure — without hedging the second leg, persistent directional moves bleed the strategy; (2) trade frequency — 0.05 trades/day on the only GO pair (BNB/ETH@4h). See Research Log Section 4.1.
 - **What worked in F:** The mean-reverting structure is real (Hurst H ≈ 0.25). Phase 0 fee sweep showed solid economics when stoploss is absent (168bps@ez=3.0). Rolling β was stable. The Phase 0 validation framework is directly reusable.
-- **LiqCascade is ACTIVE** in Phase 3 dry-run. Candidate J (Ensemble Donchian) is being built in parallel by the primary developer. L is a diversifying strategy — mean-reversion vs trend-following vs event-driven.
+- **LiqCascade is ACTIVE** in Phase 3 dry-run. **Candidate J** is **PARKED** (see `EnsembleDonchianTrend_Deep_Dive.md`). L is a diversifying strategy — **mean-reversion** vs LiqCascade **event-driven** (and vs archived/parked trend candidates).
 - **Critical lessons that apply here:** Mean-reversion half-life must be compatible with trading frequency (#9). Bull-market validation bias — check long vs short P&L symmetry (#10). Fee economics sweep before infrastructure (#7). Single-leg directional exposure is fatal (#F post-mortem).
 - **Reusable infrastructure:** `user_data/scripts/cointpairs_phase0_validation.py` (v4) — complete pipeline (ADF → EG → Johansen → Hurst → OU half-life → rolling β stability → fee sweep with time-stop rate check). `CointPairsStrategy_V02.py` and `config_cointpairs_V02.json` — single-leg strategy code (reference only; L requires dual-leg rewrite).
 
@@ -294,7 +294,7 @@ This yields **45 unique pairs** for cointegration screening. Not all will be coi
 
 ### Phase 3: Dry-Run Deployment (Week 2+)
 
-**Goal:** Forward-test Candidate L on Binance USDT-M with the **deploy-only** repo (see **Part 6**). Validate dual-leg coordination in live market conditions (not just backtest). LiqCascade / Candidate J may run elsewhere; L’s production layout is **not** a shared single-droplet compose profile.
+**Goal:** Forward-test Candidate L on Binance USDT-M with the **deploy-only** repo (see **Part 6**). Validate dual-leg coordination in live market conditions (not just backtest). LiqCascade may run elsewhere; **Candidate J (Donchian) is PARKED** (2026-04-06) — see `EnsembleDonchianTrend_Deep_Dive.md`. L’s production layout is **not** a shared single-droplet compose profile.
 
 **Implemented layout:**
 - Repository **`freqtrade-coint-pairs-trading`** (`https://github.com/whitneyjohn61/freqtrade-coint-pairs-trading`): **`docker compose --profile v01`** on one droplet, **`--profile v02`** on a second droplet; six containers (three spreads × V01 vs V02). Details: Part 6 and `deploy/README.md` in that repo.
@@ -436,15 +436,18 @@ L replaces:
 - Fixed lookback → grid-search optimized lookback
 - Single-pair → multi-pair universe
 
-### 7.4 Coordination with Candidate J
-J and L are designed to be **uncorrelated and concurrent:**
+### 7.4 Coordination with Candidate J (PARKED 2026-04-06)
+**Candidate J was PARKED** after Phase 0 NO-GO (`EnsembleDonchianTrend_Deep_Dive.md`). The rationale below remains **valid if J is reopened**; for **now**, L is the **active** paper-queue build in `AlgoTrading_Research_Log.md` §4.4.
+
+Historically, J and L were designed to be **uncorrelated and concurrent:**
 - J is long-only trend-following (serial correlation). L is market-neutral mean-reversion (equilibrium reversion).
 - J performs best in trending markets. L performs best in ranging markets.
-- J uses 20 pairs independently. L uses 10 assets in paired combinations (lab); forward-test deploy runs the **three** spreads configured in **`freqtrade-coint-pairs-trading`**.
-- They may share organizational habits (DigitalOcean, Docker) but **Candidate L production** uses the **dedicated** deploy repo and droplet layout in Part 6 — not the same compose stack as J unless you intentionally colocate on one host.
-- If both validate, deploying them together can provide genuine strategy diversification when margin and ops constraints allow.
+- J used 14 pairs independently in the lab MVP. L uses 10 assets in paired combinations (lab); forward-test deploy runs the **three** spreads configured in **`freqtrade-coint-pairs-trading`**.
+- **Candidate L production** uses the **dedicated** deploy repo and droplet layout in Part 6 — not the same compose stack as a hypothetical future J deployment unless you intentionally colocate on one host.
+- If J were **revalidated** and both strategies were active, deploying them together could still provide diversification when margin and ops constraints allow.
 
 ---
 
 *Document maintained by: Claude + co-developer*  
-*Last updated: 2026-04-03 — Documented LINK/ETH, UNI/SOL, XMR/BTC exploratory V01@4h backtests (deploy repo configs); droplet decision: no new instances on these results.*
+*Last updated: 2026-04-06 — Candidate J (Donchian) **PARKED** (Phase 0 NO-GO): Phase 3 goal text + §7.4 aligned with `AlgoTrading_Research_Log.md` §4.4; L remains active first paper-queue build.*  
+*Prior (2026-04-03): LINK/ETH, UNI/SOL, XMR/BTC exploratory V01@4h backtests (deploy repo configs); droplet decision: no new instances on these results.*

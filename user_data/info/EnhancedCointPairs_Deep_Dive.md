@@ -46,7 +46,7 @@ docker compose run --rm freqtrade backtesting --config /freqtrade/config/config_
 
 ### 1.1 Registry summary (from `AlgoTrading_Research_Log.md`)
 
-- **Sweep #4 (2026-03-31):** L surfaced with **J** (Ensemble Donchian) and **K** (MTF filter). **J** promoted to #1 build priority; **L** held as **second-priority** — concurrent diversification vs J, not formally scored 7/7.
+- **Sweep #4 (2026-03-31):** L surfaced with **J** (Ensemble Donchian) and **K** (MTF filter). **J** was promoted to #1 at sweep time but **PARKED 2026-04-06 (Phase 0 NO-GO)**; **L** is now **first among paper-queue strategy builds** in `AlgoTrading_Research_Log.md` §4.4 — not formally 7/7-scored; concurrent diversification vs LiqCascade.
 - **Sources:** Palazzi (*Journal of Futures Markets*, Aug 2025) — adaptive trailing stop + vol filter + grid-search lookbacks + walk-forward; Tadi & Witzany (*Financial Innovation*, 2025) — copula pairs on **Binance USDT-M**; IEEE-style finding that **higher frequency** pairs trading dominates daily.
 - **Why L for this lab:** Reuses **`cointpairs_phase0_validation.py` (v4)**; addresses **F**’s structural failures (dual-leg; target higher frequency via universe + TF choices).
 - **Stated risks in log:** Dual-leg coordination in Freqtrade (same conditional concern as F §3); capital intensity; Palazzi uses **daily** — we validated on **4h** after Phase 0; execution/slippage at very high frequency not attempted in MVP.
