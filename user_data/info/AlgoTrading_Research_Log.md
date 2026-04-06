@@ -1,6 +1,6 @@
 # AlgoTrading Research Log
 ## Maintained by: [Developer] + Claude (any model)
-## Last Updated: 2026-04-06
+## Last Updated: 2026-04-06 (Phase 3.5 OI filter deployed — V05)
 ## Stack: Cursor / Freqtrade / FreqAI / Claude Opus 4.6
 
 ---
@@ -219,29 +219,29 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 ### 4.2 ACTIVE
 
 #### Liquidation Cascade Strategy (v1.0)
-- **Status:** ACTIVE — Phase 3 (Live Dry-Run), deployed 2026-03-18
+- **Status:** ACTIVE — Phase 3.5 (OI Filter Deployed, V05), since 2026-04-06
 - **Core idea:** Detect forced liquidation cascades via Binance WebSocket data as primary alpha signal. Regime framework demoted to context filter only (CRISIS gate + EMA200 macro trend)
-- **Architecture:** Sidecar process (WebSocket liquidation stream) → signal file → Freqtrade 5m strategy reads signal → enter with-trend cascade, exit via 2×ATR target / 1×ATR stop / 30min time stop. 4x leverage
-- **Why this is different from RAME:** Alpha source is a mechanical market event (forced liquidations), not indicator prediction. Signal is directionally unambiguous while occurring. Not lagged — detected in real time
-- **Current deployment:** DigitalOcean droplet, Docker, 5 pairs dry-run: BTC/USDT, ETH/USDT, SOL/USDT, BNB/USDT, XRP/USDT. max_open_trades=5.
-- **Phase plan:** Phase 3 (dry-run, 4+ weeks) → Phase 3.5 (LOB-OFI+OI filter validation) → Phase 4 (hyperopt) → Phase 5 (additional pairs if needed) → Phase 6 (live capital)
-- **Go/no-go for Phase 4:** 20+ trades, profit factor > 1.0, win rate > 40%, sidecar uptime > 99%
-- **Phase 3.5 (ACTIVE — 2026-03-21):** OI change rate instrumentation deployed to sidecar. `oi_contracts` and `oi_change_pct_1m` now logged per symbol per minute in `signal_history.jsonl`. Enables retrospective validation of LOB-OFI+OI entry filter once 20+ trades accumulated. Strategy V04 unchanged. See Deep Dive Phase 3.5 for full details.
-- **Phase 3 preliminary results (2026-03-22 — 5 days, 129 trades):**
-  - Win rate: 39.5% | Avg profit: -0.207% | Profit factor: 0.659 — **below Phase 4 thresholds**
-  - Exit breakdown: `time_stop` 76 trades (59%, avg -1.031%, 0% win) · `roi` 49 trades (38%, avg +0.738%, 96% win) · `trailing_stop_loss` 4 trades (3%, avg +3.859%, 100% win)
-  - **Root cause: 59% time-stop rate.** Signal is real (roi/trailing exits are excellent) but VOL_SPIKE_MULT/CANDLE_BODY_MULT thresholds are too loose — generating ~26 entries/day across 5 pairs vs expected 1–2 genuine cascades/pair/day. False-positive entries have no cascade momentum and exit at -1% via time stop.
-  - By pair: ETH -0.044%, SOL +0.068% (near break-even) · BTC -0.437%, BNB -0.413% (worst) · XRP -0.185%
-  - **Action:** Do not change parameters yet — 5 days is a single regime snapshot. Revisit at **2026-04-05** with 2+ weeks of data. If time-stop rate remains >50%, tighten thresholds before Phase 4 hyperopt.
-  - **Phase 3.5 OI retrospective:** Run at 2026-04-05 once ~100+ trades have OI data attached (instrumentation live since 2026-03-21). Key question: do roi/trailing exits have higher OI change rate at entry than time_stop exits?
-  - **Analysis script:** `user_data/scripts/ft_analyze.py` — run via `docker cp ft_analyze.py freqtrade_liqcascade:/tmp/ && docker exec freqtrade_liqcascade python /tmp/ft_analyze.py`
+- **Architecture:** Sidecar process (WebSocket liquidation stream + OI polling) → signal file → Freqtrade 5m strategy reads signal → enter with-trend cascade, exit via 2×ATR target / 1×ATR stop / 30min time stop. 4x leverage
+- **Current deployment:** DigitalOcean droplet, Docker, 5 pairs dry-run: BTC/USDT, ETH/USDT, SOL/USDT, BNB/USDT, XRP/USDT. max_open_trades=5. Strategy V05.
+- **Phase plan:** Phase 3 (dry-run) ✓ → Phase 3.5 (OI filter) ACTIVE → Phase 4 (hyperopt) → Phase 5 (additional pairs if needed) → Phase 6 (live capital)
+- **Go/no-go for Phase 4:** profit factor >1.0, win rate >40%, time-stop rate <50% — reassess 2026-04-20
+- **Phase 3 full results (2026-04-05 — 19 days, 389 trades):**
+  - Win rate: 43.4% | Profit factor: 0.473 | Time-stop rate: 60.7% (236 trades, avg -1.18%)
+  - Exit breakdown: `roi` avg +0.66% (98.6% win) · `trailing_stop_loss` avg +3.78% (100% win) · `time_stop` 0% win
+  - Root cause confirmed: entry thresholds too loose — generates ~20 entries/day; genuine cascades ~1-2/pair/day
+  - Raw liquidation USD uninformative — losers averaged HIGHER USD at entry (276K vs 206K)
+- **Phase 3.5 OI retrospective (2026-04-06 — 304 trades, March 21–30):**
+  - OI change rate discriminates 1.67× overall; 2.3× for short entries specifically
+  - Winners mean |oi_change_pct_1m|=0.091; losers mean=0.054
+  - Per-pair: XRP 4.74×, BNB 2.60×, ETH 1.36×, SOL 1.26×, BTC 0.96× (none)
+  - V05 filter: `|oi_change_pct_1m| >= 0.06` on short entries for ETH/SOL/BNB/XRP only
+  - Sidecar JSONL logging bug fixed (unguarded IO exception in `_write_snapshot` → reconnect loop)
 - **Open questions:**
   1. Counter-trend cascade quality (short squeezes in bear markets)
-  2. Optimal proxy thresholds (VOL_SPIKE_MULT, CANDLE_BODY_MULT) — **flagged by Phase 3 preliminary: likely too loose**
+  2. OI filter threshold review at 2026-04-20 — tighten if short win rate still <40%
   3. ATR-relative vs fixed ROI targets
   4. Funding rate as entry pre-condition
-  5. Cascade failure mode characterization
-  6. LOB-OFI + OI filter utility — does OI change rate at cascade detection predict 15–35 min trade outcomes? (Phase 3.5 retrospective — run 2026-04-05)
+  5. BTC-specific filter — OI unhelpful; consider tighter CASCADE_MULT in sidecar for BTC only
 - **Deep dive:** `LiquidationCascade_Deep_Dive.md` (in `freqtrade-scalper` repo)
 
 ---

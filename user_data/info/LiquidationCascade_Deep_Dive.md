@@ -1,5 +1,5 @@
 # Liquidation Cascade Strategy — Deep Dive
-## Version 1 | Started: 2026-03-17 | Status: ACTIVE — Phase 3 Dry-Run (Preliminary Results: PF 0.659, below threshold — reassess 2026-04-05)
+## Version 1 | Started: 2026-03-17 | Status: ACTIVE — Phase 3.5 (OI Filter Deployed — V05, 2026-04-06)
 
 ---
 
@@ -9,13 +9,12 @@
 > Combined with `~/.claude/projects/.../memory/MEMORY.md`, this provides full context.
 
 ### Current Status
-- **Phase:** 3 — Live Dry-Run (ACTIVE) — deployed to DigitalOcean droplet 2026-03-18
-- **Last completed (2026-03-22):** Phase 3 preliminary analysis — 129 trades over 5 days. Win rate 39.5%, profit factor 0.659 — below Phase 4 thresholds. Root cause: time_stop exits dominating at 59% (0% win rate), indicating VOL_SPIKE_MULT/CANDLE_BODY_MULT thresholds too loose (~26 entries/day vs expected 1–2 genuine cascades/pair/day). Signal alpha is real (roi exits: 96% win rate, trailing exits: 100%) — selectivity is the problem.
-- **Previously (2026-03-21):** Phase 3.5 instrumentation — OI change rate (`oi_contracts`, `oi_change_pct_1m`) added to sidecar snapshot and `signal_history.jsonl`.
-- **Previously (2026-03-20):** Expanded to 5 pairs (BTC/ETH/SOL/BNB/XRP), max_open_trades raised to 5.
-- **Next immediate step:** Continue accumulating data. Reassess 2026-04-05 (2-week mark). If time_stop rate still >50%, tighten thresholds before Phase 4. Also run Phase 3.5 OI retrospective (will have 100+ instrumented trades by then).
-- **Open decisions:** Do NOT tighten thresholds yet — 5 days is one regime snapshot. Revisit 2026-04-05.
-- **Go/no-go for Phase 4:** 20+ trades ✓ · profit factor >1.0 ✗ · win rate >40% ✗ · sidecar uptime >99% (unknown) — blocked until 2026-04-05 reassessment.
+- **Phase:** 3.5 — OI Filter deployed (V05, 2026-04-06). DB not reset — pre-V05 trades retained for comparison.
+- **Last completed (2026-04-06):** OI retrospective analysis (304 trades, March 21–30) confirmed OI change rate discriminates winners from losers at 1.67× overall, 2.3× for short entries. V05 deployed with `|oi_change_pct_1m| >= 0.06` gate on short entries for non-BTC alts. Sidecar defensive logging fix deployed simultaneously.
+- **Previously (2026-03-22):** Phase 3 full analysis — 389 trades over 19 days. Win rate 43.4%, profit factor 0.473, time-stop rate 60.7%. Root cause confirmed: VOL_SPIKE_MULT/CANDLE_BODY_MULT thresholds too loose. Signal alpha real (roi: 98.6% win, trailing: 100% win).
+- **Previously (2026-03-21):** Phase 3.5 instrumentation — OI change rate (`oi_contracts`, `oi_change_pct_1m`) added to sidecar; sidecar logging halted 2026-03-30 (IO exception in JSONL write swallowed by reconnect loop — fixed in sidecar 2026-04-06).
+- **Next immediate step:** Run V05 for 2+ weeks. Compare filtered period (V05) vs unfiltered period (V04) directly — do NOT mix aggregate metrics until 2+ weeks of filtered data.
+- **Go/no-go for Phase 4:** profit factor >1.0, win rate >40%, time-stop rate <50% — reassess 2026-04-20.
 
 ### Key Commands
 ```
@@ -587,11 +586,23 @@ Signal history logging added: `sidecar/logs/signal_history.jsonl` — one JSON l
 | roi | 49 (38%) | +0.738% | 95.9% |
 | trailing_stop_loss | 4 (3%) | +3.859% | 100.0% |
 
-**Root cause analysis:**
-- time_stop dominance (59%, 0% wins) = VOL_SPIKE_MULT / CANDLE_BODY_MULT thresholds too loose. Strategy firing ~26 entries/day vs expected 1–2 genuine cascades/pair/day.
-- Signal alpha is real: roi exits +0.738% avg (96% win), trailing exits +3.859% avg (100% win). The cascade event is being captured correctly — but too many non-cascade entries are being taken alongside it.
-- Fix: raise VOL_SPIKE_MULT and/or CANDLE_BODY_MULT to improve selectivity. Do NOT change exit logic or stop parameters — those are performing correctly.
-- Decision: do not tighten parameters until 2026-04-05 (2-week mark) to avoid reacting to a single regime. Current market (March 2026) is in drawdown — cascades fire frequently in bearish conditions.
+**Dry-run full results as of 2026-04-05 (Day 1–19, 389 trades):**
+
+| Metric | Value |
+|--------|-------|
+| Closed trades | 389 |
+| Win rate | 43.4% |
+| Profit factor | 0.473 |
+| Time-stop rate | 60.7% (236 trades, avg –1.18%, 0% win) |
+| ROI exit rate | ~37% (avg +0.66%, 98.6% win) |
+| Trailing stop rate | ~2% (avg +3.78%, 100% win) |
+
+**Root cause analysis (confirmed at 19 days):**
+- 60.7% time-stop dominance with 0% win rate is the primary P&L drain. Each time-stop costs ~1.18% at leverage.
+- Alpha is structurally real: roi exits at 98.6% win, trailing at 100%. The problem is upstream entry quality, not exit logic.
+- Raw liquidation USD at entry does not discriminate winners from losers — losers actually averaged higher USD (276K vs 206K). Volume alone cannot distinguish genuine cascades from high-volume noise events.
+- OI change rate DOES discriminate: genuine cascades close positions (OI drops), noise events open positions (OI flat/rising). This is the correct second confirmation signal.
+- Exit logic: no changes — performing correctly.
 
 **Day 1 sample (2026-03-18, for reference):**
 - Trades 10–13: first 4 trades showed 80% ROI win rate — early signal looked strong
@@ -706,8 +717,42 @@ If retrospective analysis confirms filter utility:
 - Retrospective OI analysis shows statistically meaningful separation between winners and losers
 - Filter removes at least 20% of losing entries without removing more than 10% of winning entries
 
-**Results (to be filled in):**
-> *[Awaiting 20+ dry-run trades for retrospective analysis]*
+**Results (2026-04-06):**
+
+Retrospective analysis run on 304 trades (March 21–30 — the window with continuous OI data), joined with `signal_history.jsonl` by timestamp + pair.
+
+**Overall discrimination:**
+| Cohort | Mean \|oi_change_pct_1m\| at entry |
+|--------|-------------------------------------|
+| Winners | 0.091 |
+| Losers  | 0.054 |
+| Ratio   | 1.67× |
+
+**By direction:**
+- Short entries: **2.3× discrimination** — filter applies
+- Long entries: **inverted** (losers had higher OI change rate) — filter not applied
+
+**By pair:**
+| Pair | Discrimination ratio |
+|------|----------------------|
+| XRP  | 4.74× |
+| BNB  | 2.60× |
+| ETH  | 1.36× |
+| SOL  | 1.26× |
+| BTC  | 0.96× (no signal) |
+
+**Key finding:** Raw liquidation USD at entry was *not* predictive — losers averaged $276K vs $206K for winners. Volume size alone does not distinguish real cascades from high-volume noise. OI change rate (position closures) is the correct orthogonal signal.
+
+**Filter implemented in V05:**
+- Short entries, alts (ETH/SOL/BNB/XRP): `|oi_change_pct_1m| >= 0.06`
+- Short entries, BTC: no filter (0.96× — statistically indistinct)
+- Long entries, all pairs: no filter (inverted)
+- OI unavailable (sidecar restart, fetch failure): short alt entries blocked (fail-safe)
+
+Threshold 0.06 rationale: 11% above loser mean (0.054), well below winner mean (0.091). Conservative given ~300-trade calibration sample.
+
+**Sidecar logging bug fixed (2026-04-06):**
+`signal_history.jsonl` writes stopped on 2026-03-30. Root cause: IO exception in the JSONL append inside `_write_snapshot()` was unguarded — propagated to the WebSocket reconnect handler, causing the sidecar to enter a reconnect loop on every write cycle. `liquidation_data.json` (atomic write, earlier in the function) continued updating, so the strategy kept trading — only the JSONL log stopped. Fix: wrapped both JSONL append and raw log flush in isolated try/except blocks with explicit error logging.
 
 ---
 
@@ -818,6 +863,9 @@ This section records significant architectural decisions with rationale, for fut
 | 2026-03-17 | Proxy designed for replaceability | `_get_cascade_signal()` method isolates signal source; Phase 3 replaces it with WebSocket data without changing any other logic |
 | 2026-03-20 | Expand to 5 pairs (SOL/BNB/XRP added) | Dry-run time is fixed regardless of pair count. Dynamic baseline in sidecar self-calibrates per symbol — no static threshold re-tuning required. max_open_trades raised to 5. |
 | 2026-03-20 | Reject hard-blocking counter-trend on new pairs | Same rationale as BTC/ETH: short squeezes are real on all pairs; leverage asymmetry (4x/2x) prices the risk appropriately. |
+| 2026-04-06 | OI filter: alts short only, BTC exempt, longs exempt | Retrospective showed BTC discrimination 0.96× (no signal) and long-entry OI is inverted. Applying filter where the data says to. |
+| 2026-04-06 | OI threshold 0.06 (not 0.05 loser mean) | 11% above loser mean provides a real filter margin. 0.05 is essentially the loser distribution midpoint — barely selective. Review at 2026-04-20. |
+| 2026-04-06 | NaN oi_change_pct_1m blocks short alt entries | Fail-safe: if OI fetch fails, we don't know if the cascade is genuine. Block until data resumes. Long entries unaffected — no OI filter there. |
 
 ---
 
@@ -854,4 +902,4 @@ Questions to be answered by backtest evidence, not prior assumptions:
 ---
 
 *Document maintained by: Claude Sonnet 4.6 + project co-developer*
-*Last updated: 2026-03-22 — Phase 3 preliminary results added (129 trades, 5 days): win rate 39.5%, PF 0.659, 59% time_stop (0% win). Root cause: entry thresholds too loose. Signal alpha confirmed real via roi/trailing exits. Next reassessment: 2026-04-05.*
+*Last updated: 2026-04-06 — Phase 3 full results added (389 trades, 19 days): PF 0.473, 60.7% time-stop. OI retrospective completed (304 trades): 1.67× overall discrimination, 2.3× for short entries. V05 deployed with OI filter (threshold 0.06 for short alt entries). Sidecar JSONL logging bug fixed. Next reassessment: 2026-04-20 (2 weeks of filtered data).*
