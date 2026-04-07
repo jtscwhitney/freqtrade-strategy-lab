@@ -1,6 +1,6 @@
 # AlgoTrading Research Log
 ## Maintained by: [Developer] + Claude (any model)
-## Last Updated: 2026-04-06 (Phase 3.5 OI filter deployed — V05)
+## Last Updated: 2026-04-07 (Sweep #5 complete — Candidate M promoted to #1)
 ## Stack: Cursor / Freqtrade / FreqAI / Claude Opus 4.6
 
 ---
@@ -43,6 +43,8 @@
 - `user_data/info/EnsembleDonchianTrend_Deep_Dive.md` — Candidate J deep dive (**PARKED** — implementation retained for reference)
 - `user_data/info/EnhancedCointPairs_Dev_Plan.md` — Candidate L development plan (NEW)
 - `user_data/info/EnhancedCointPairs_Deep_Dive.md` — Candidate L deep dive (ACTIVE; mirrored in `freqtrade-coint-pairs-trading`)
+- `user_data/info/AdaptiveTrend_Dev_Plan.md` — Candidate M development plan (ACTIVE — Phase 0 not yet started)
+- OracleSurfer strategy — in `Freqtrade` repo (separate): `user_data/strategies/OracleSurfer_v14_PROD.py` (ACTIVE dry-run on DigitalOcean droplet)
 
 **Research & Development Workflow:**
 
@@ -242,7 +244,36 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
   3. ATR-relative vs fixed ROI targets
   4. Funding rate as entry pre-condition
   5. BTC-specific filter — OI unhelpful; consider tighter CASCADE_MULT in sidecar for BTC only
+- **Repo:** `freqtrade-scalper` (local, separate repo) — `strategies/LiqCascadeStrategy_V05.py`, `sidecar/liquidation_monitor.py`
 - **Deep dive:** `LiquidationCascade_Deep_Dive.md` (in `freqtrade-scalper` repo)
+
+#### OracleSurfer Strategy (v14 PROD) — *Retroactive entry; pre-dates this Research Log*
+- **Note:** Active project in the separate `Freqtrade` repo (not `freqtrade-strategy-lab`). Added retroactively 2026-04-07. Version history spans v6–v14; tracked here from v12 dry-run results onward.
+- **Status:** ACTIVE — v14 deployed and running 2026-04-06 (dry-run). Redeployed to DigitalOcean droplet via `git pull` + deploy script. Prior version: v12 (dry-run Feb 22 – Apr 6, 2026, 8 trades).
+- **Core idea:** FreqAI XGBoost classifier trained on 4h features to predict 3-class market regime (BEAR / NEUTRAL / BULL) using triple-barrier labeling. Entry on Oracle signal + EMA200 trend alignment + RSI momentum + ADX strength gate. Exits via ROI ladder, trailing stop, or hard stop. Single pair: BTC/USDT:USDT futures, 1h execution timeframe. No sidecar — pure OHLCV + FreqAI.
+- **Architecture:** FreqAI (XGBoost) → `&s_regime_class` column → entry filter (EMA200 + RSI + ADX) → Freqtrade execution. 3-year training window, 4h feature timeframe, retrain every 6h live. Features: Choppiness Index, KAMA distance, SMA200 valuation distance, VIX-Fix synthetic fear gauge, OBV oscillator, 5-period ROC.
+- **Current deployment:** DigitalOcean droplet (same box as LiqCascade), Docker, BTC/USDT:USDT only, `dry_run: true`. Strategy: `OracleSurfer_v14_PROD`. Config: `config_sniper_BTC_DryRun.json`. FreqAI identifier: `Oracle_Surfer_v12_v2_DryRun`. API port: 8080.
+- **v12 dry-run results (2026-02-22 – 2026-04-06, 8 trades):**
+  - Win rate: 50% | Profit factor: 0.31 | Net P&L: -8.2% (-$81.20 on $990 starting capital)
+  - Exit breakdown: 4× trailing SL (+2.98% avg) · 4× hard SL (-10.27% avg)
+  - Root cause: asymmetric stop/reward. -10% hard stop vs ~3% avg winning exit → required ~77% WR to break even. At 50% WR, structurally unprofitable regardless of signal quality.
+  - Failure mode: 4 consecutive short entries Feb–Mar stopped out during sustained BTC uptrend (~$63K → $75K). Oracle signal may have been correct directionally at entry but -10% stop gave market too much room to run against position first.
+- **v12 → v14 structural overhaul (deployed 2026-04-06):**
+  - **Stop tightened:** -10% → -5% (precision over survival — tighter entries need less room)
+  - **ROI ladder added:** +10% any time / +7% at 8h / +5% at 16h / +3% at 24h (forces exit on stalling trades; replaces uncapped hold)
+  - **Break-even moved earlier:** +3% → +2% (bridges gap before trailing activates at +5%)
+  - **Entry tightened:** EMA200 trend alignment + RSI >50 / <50 momentum confirmation + ADX >20 (was >15). MACD removed (lagging vs Oracle signal).
+  - **Oracle label horizon:** 96h → 48h (faster regime response); barrier changed to 1.5× ATR; bear priority added (when both barriers simultaneously hit, classify BEAR — safety bias against falling-knife longs)
+  - **DCA disabled:** `position_adjustment_enable: false` (was true, max 3 adjustments)
+  - **Training expanded:** 1yr → 3yr lookback (captures full BTC cycles); 2 shifted candles added; regularization added (subsample=0.8, colsample_bytree=0.8, n_estimators 100→200, learning_rate 0.1→0.05); retrain 1h → 6h
+  - **Breakeven math fixed:** -5% stop vs ~7.5% avg target → breakeven at ~40% WR (robust). v12 required ~77% WR — an impossible bar at realistic signal quality.
+- **Go/no-go for v14 continuation:** profit factor >1.0, win rate >45% — reassess after **15 closed trades or 2026-07-07**, whichever comes first. At v12's observed frequency (~1 trade/5–6 days) and v14's tighter entry filters, 15 trades represents ~3 months of swing-frequency forward testing — the minimum for a statistically meaningful read on this strategy class.
+- **Open questions:**
+  1. v14 dry-run results — assess win rate and PF after structural overhaul; see go/no-go above
+  2. BTC-only vs multi-pair expansion — scale only after v14 proves profitable in dry-run
+  3. Oracle signal quality at 48h horizon — does faster reaction improve entries or introduce label noise?
+  4. Regime context — EMA200 + ADX sufficient or should CRISIS gate from LiqCascade be adopted?
+- **Repo:** `Freqtrade` (local, separate repo) — `user_data/strategies/OracleSurfer_v14_PROD.py`, `user_data/config_sniper_BTC_DryRun.json`
 
 ---
 
@@ -395,31 +426,192 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Best use:** As a **filter/enhancement** for **trend or breakout follow-ons** (e.g. future candidates) or for LiqCascade (only take cascade entries when macro trend confirms direction). *Formerly framed as a J Phase 2 add-on; J is now **PARKED**.* Not recommended as standalone given single-asset scope.
 - **Evaluation filter score:** Not formally scored — recommended as technique/filter rather than standalone strategy. If applied as a filter to a **multi-timeframe trend or breakout** design, it adds little data cost, no ML, and addresses Lesson #4 directly.
 
+#### CANDIDATE M: AdaptiveTrend — Systematic Multi-Pair Momentum with Adaptive Portfolio Construction
+- **Status:** CANDIDATE — surfaced in Sweep #5 (2026-04-07); **#1 build priority** (§4.4); **Dev Plan created 2026-04-07** (`AdaptiveTrend_Dev_Plan.md`); Phase 0 not yet started
+- **Source:** Bui & Nguyen (arXiv 2602.11708, February 2026) — "Systematic Trend-Following with Adaptive Portfolio Construction: Enhancing Risk-Adjusted Alpha in Cryptocurrency Markets"
+- **Core idea:** Pure rate-of-change momentum signal (`(P_t - P_{t-L}) / P_{t-L}`) on 6h candlesticks across 150+ crypto pairs. Three enhancements over classical TSMOM: (1) ATR-calibrated dynamic trailing stops (`stop = max(prior_stop, price - 2.5×ATR)`), (2) monthly rolling-Sharpe-based pair selection (enter only pairs achieving SR ≥ 1.3 for longs / 1.7 for shorts on prior month's data), (3) 70/30 asymmetric long-short allocation grounded in crypto's empirical upward drift.
+- **Why it's interesting for us:** This directly addresses the recurring translation failure in prior sweeps. The signal is pure OHLCV rate-of-change — no ML model, no sidecar, no special data feed. The trailing stop mechanism is essentially identical to what LiqCascade already uses (ATR-based). The multi-pair architecture satisfies our trading frequency objective. The 70/30 allocation provides bear-market protection without going delta-neutral. Classical time-series momentum has decades of live practitioner deployment across asset classes; the portfolio construction enhancements are the modern element. The applied history criterion is strongly satisfied.
+- **Performance (OOS: Jan 2022 – Dec 2024, 36 months, 150+ pairs):**
+
+  | Strategy | Ann. Ret. | Ann. Vol. | Sharpe | MDD | Calmar | Sortino |
+  |---|---|---|---|---|---|---|
+  | **AdaptiveTrend 70/30** | **40.5%** | **16.8%** | **2.41** | **-12.7%** | **3.18** | **3.62** |
+  | AdaptiveTrend 50/50 | 34.2% | 15.1% | 2.12 | -14.3% | 2.39 | 3.01 |
+  | Vol-Scaled TSMOM | 22.8% | 10.0% | 1.83 | -16.1% | 1.42 | 2.15 |
+  | TSMOM-1M | 18.4% | 21.3% | 0.65 | -34.8% | 0.53 | 0.89 |
+  | EW Buy-and-Hold | 8.3% | 52.1% | 0.07 | -72.4% | — | — |
+  | BTC Buy-and-Hold | 12.6% | 48.7% | 0.17 | -64.1% | — | — |
+
+- **Regime breakdown (rolling 60d BTC return):**
+
+  | Regime | Ann. Return | Sharpe | MDD | Win Rate | Avg Trade PnL |
+  |---|---|---|---|---|---|
+  | Bull (>+15%) | 68.3% | 3.42 | -7.1% | 54.2% | +1.82% |
+  | Sideways | 18.7% | 1.87 | -9.4% | 47.8% | +0.63% |
+  | Bear (<-15%) | -4.2% | -0.31 | -12.7% | 41.3% | -0.21% |
+
+  Strategy profits in bull and sideways regimes (covers most calendar time); bear regime loses money but MDD is contained at -12.7% vs -64% for BTC buy-and-hold.
+
+- **Ablation study — component contributions:**
+
+  | Configuration | Sharpe | MDD |
+  |---|---|---|
+  | Full AdaptiveTrend | 2.41 | -12.7% |
+  | w/o Dynamic Trailing Stop | 1.68 | -22.4% |
+  | w/o Sharpe Ratio Selection | 1.92 | -19.1% |
+  | w/o Market Cap Filter | 2.05 | -17.8% |
+  | w/o Asymmetric Allocation | 2.12 | -14.3% |
+  | **Fixed Parameters (no monthly opt.)** | **1.34** | **-28.6%** |
+
+  **Critical MVP implication:** monthly optimization contributes +1.07 Sharpe (from 1.34 to 2.41). An MVP with fixed parameters gets ~Sharpe 1.34 — still above 1.0 but materially below headline numbers. The trailing stop is the single highest-value component (+0.73 Sharpe). Since we already implement ATR trailing stops natively (LiqCascade, OracleSurfer), this is the easiest win.
+
+- **Timeframe comparison (net of 4 bps costs):**
+
+  | TF | Sharpe | MDD | Trades/Month |
+  |---|---|---|---|
+  | H1 | 1.54 | -21.3% | 847 |
+  | H4 | 2.08 | -15.6% | 213 |
+  | **H6** | **2.41** | **-12.7%** | **142** |
+  | H8 | 2.18 | -14.1% | 108 |
+  | D1 | 1.63 | -19.4% | 41 |
+
+  H6 is explicitly confirmed as optimal. H1 is significantly worse (Sharpe 1.54) — not just marginally.
+
+- **Fee sensitivity (our cost vs paper):**
+  - Paper baseline: 4 bps/trade (likely per side → 8 bps round-trip)
+  - Our cost: 5 bps/side → 10 bps round-trip
+  - Paper sensitivity: 8 bps → Sharpe 2.01 · 12 bps → Sharpe 1.62
+  - At our 10 bps: estimated Sharpe ~1.85 (interpolated). Still strong.
+
+- **Exact algorithm (from paper pseudocode):**
+  - Entry: `MOM_t = (P_t - P_{t-L}) / P_{t-L}`; long if `MOM_t > θ_entry`, short if `MOM_t < -θ_entry`
+  - Trailing stop: `S_t = max(S_{t-1}, P_t - α × ATR_t)` where α ≈ 2.5 (optimal range: 2.0–3.5)
+  - Close when `P_t < S_t`
+  - Monthly: grid-search optimize `(θ_entry, α, L)` on prior month; select assets with prior-month SR ≥ 1.3 (longs) / 1.7 (shorts)
+  - Long universe: top-15 by market cap. **Short universe: bottom-KS by market cap (lower-liquidity altcoins)**
+
+- **Stack translation assessment:**
+  - **Signal (MOM_t):** `PASS` — single arithmetic formula on 6h OHLCV, Freqtrade-native
+  - **ATR trailing stop:** `PASS` — identical to existing `custom_stoploss()` in LiqCascade/OracleSurfer
+  - **Monthly Sharpe-based selection:** `CONDITIONAL` — grid search over prior month needed; for MVP use fixed params + fixed whitelist. Plan monthly optimization for Phase 1.
+  - **70/30 allocation:** `CONDITIONAL` — approximate via `max_open_trades` split (e.g., 10 long slots / 4–5 short slots) and equal stake_amount per slot
+  - **Market cap data:** `PASS` — CoinGecko free API daily, or hardcoded top-15 reviewed monthly
+  - **Short universe (small caps):** `FLAG` — paper uses bottom-KS by market cap = lower-liquidity assets. For MVP, restrict short universe to liquid alts only (ETH, SOL, BNB, etc.) to avoid slippage surprises
+- **Key risks (updated from full paper):**
+  - Monthly optimization contributes +1.07 Sharpe — MVP without it gets ~1.34 baseline, not 2.41. This is the most important thing to understand before Phase 0.
+  - Short portfolio targets small-cap assets — slippage risk at scale; use liquid alts only for our implementation
+  - Bear regime still loses money (-4.2%, Sharpe -0.31) — the strategy reduces but does not eliminate bear exposure
+  - 36-month OOS window; includes 2022 bear and 2024 bull but not 2025 data
+  - From full paper: paper team is "Talyxion Research, Hanoi, Vietnam" — no institutional pedigree. Bootstrap significance is solid methodology but independent replication not yet available
+- **Complementarity:** HIGH — 6h systematic trend-following across 150+ pairs vs LiqCascade's event-driven 5m cascade detection and OracleSurfer's 1h ML regime classification. Different signal, timeframe, market conditions. All three can run concurrently.
+- **MVP approach (revised):** Phase 0 — implement signal + ATR trailing stops on fixed whitelist of 15–20 liquid pairs (top-15 by market cap for longs + 5–8 liquid alts for shorts), fixed parameters, 70/30 slot split. Expected baseline Sharpe ~1.34 with fixed params. Run fee-inclusive backtest 2022–2024 with regime splits. Phase 1 — add monthly parameter optimization if Phase 0 clears PF > 1.0.
+- **Supporting papers analyzed (2026-04-07):**
+
+  **Karassavidis et al. (SSRN 5821842)** — "Quantitative evaluation of volatility-adaptive trend-following models in cryptocurrency markets"
+  - Architecture: SMA(10/38) crossover + RSI filter (RSI must touch ≤44 within 5 days prior) + ATR trailing stop on H8 bars. BTC+ETH only, joint cross-asset objective. ~22 trades/year.
+  - **Fatal caveat: ALL results are in-sample (2020–2025). No walk-forward validation.** Reported SR 1.67, CAGR 22%, MaxDD 11% are upper bounds, not production expectations.
+  - 2020-2025 window includes the largest crypto bull run in history — favorable regime selection.
+  - **Key M contribution:** Independently validates ATR trailing stop as highest-value exit component (+0.73 SR in Bui ablation study; Karassavidis ablation confirms similar). EMA slope exit explicitly tested and discarded — do not implement.
+  - **ATR trail trigger (8.57 ATR):** Suspiciously precise — treat as in-sample artifact. M MVP uses always-on trailing (no profit-trigger threshold).
+  - **Not a standalone candidate:** ~22 trades/year fails our frequency objective. In-sample-only results fail Evaluation Filter criterion 4. SMA+RSI entry architecture is a potential Phase 1 signal enhancement for M, not a separate build.
+
+  **Huang, Sangiorgi & Urquhart (SSRN 4825389, 2024)** — "Cryptocurrency Volume-Weighted Time Series Momentum"
+  - Volume-weighted WML portfolio outperforms capital-weighted TSMOM. Optimal lookback: 3–7 days (aligns with M's 6-day default). Effect attenuated post-2018 — genuine concern for current deployment.
+  - Transaction costs material at 20 bps (our 10 bps is less severe; still relevant).
+  - Portfolio-level evidence only — no single-pair validation.
+  - **Not a standalone candidate:** Structurally similar to Candidate G (cross-sectional momentum, PARKED). Post-2018 attenuation means standalone candidacy would require fresh OOS validation we don't have. Better as a Phase 1 signal enhancement: weight ROC signal by rolling volume ratio before comparing to θ_entry.
+
+- **Evaluation filter score:** Scored 2026-04-07 — see below
+
+**CANDIDATE M — EVALUATION FILTER:**
+
+| # | Criterion | Assessment | Pass/Fail |
+|---|---|---|---|
+| 1 | **Data availability** | Standard OHLCV at 6h (available via Binance/CCXT). Daily market cap for asset filtering (CoinGecko free API or hardcoded top-15 list). No special data feed required. | **PASS** |
+| 2 | **Compute fit** | Rate-of-change signal is arithmetic. ATR is TA-Lib standard. Monthly grid search optimization is CPU-only, runs in minutes on 150 pairs. No GPU, no ML training overhead. | **PASS** |
+| 3 | **Freqtrade compatibility** | 6h timeframe: supported. ATR trailing stops: native `custom_stoploss()`. Multi-pair: supported. Monthly Sharpe-based selection and 70/30 portfolio allocation require custom logic but have clear MVP simplifications (fixed whitelist + max_open_trades split). Not a blocker — conditional pass. | **CONDITIONAL PASS** |
+| 4 | **Out-of-sample evidence** | 36-month walk-forward (2022-2024) including full bear-recovery cycle. Tested vs TSMOM benchmarks with p < 0.001 statistical significance. Rate-of-change momentum has decades of out-of-sample evidence across equities, futures, and FX — crypto is the most recent extension. Multiple independent papers confirm TSMOM works in crypto (Beluška & Vojtko 2024, Huang et al. 2024, CTBench 2025). | **PASS** |
+| 5 | **Clear mechanism** | Serial return autocorrelation (trend persistence) is one of the most documented anomalies in finance — 40+ years of evidence across asset classes. In crypto, narrative-driven capital flows, leverage liquidation cascades, and retail-dominated markets create stronger serial correlation than traditional markets. The three enhancements (ATR stops, Sharpe selection, asymmetric allocation) are mechanistically grounded, not curve-fitted add-ons. | **PASS** |
+| 6 | **Complementarity** | HIGH. Different signal (momentum vs cascade vs ML regime), timeframe (6h vs 5m vs 1h), and market conditions (trending vs volatile vs ML-classified). No signal overlap with LiqCascade or OracleSurfer. | **PASS** |
+| 7 | **Implementation scope** | Phase 0 MVP feasible in 3–4 days: download 6h OHLCV for 15–20 pairs, implement rate-of-change signal + ATR trailing stop, run fee-inclusive backtest with regime splits. No model training, no sidecar for MVP. Phase 1 (rolling Sharpe selection) adds 2–3 more days. | **PASS** |
+
+**Filter score: 6/7 (1 conditional pass) → Overall: PASS**
+
+**Co-investigator assessment:** This is the cleanest stack-to-paper fit we've seen since LiqCascade. The signal is a single arithmetic formula. The exit mechanism is already proven in our stack. The multi-pair architecture is native Freqtrade. The applied history criterion — which the user specifically requested for Sweep #5 — is as strong as it gets: rate-of-change momentum has been deployed in live funds for decades. The novel element (portfolio construction layer) is an enhancement, not a prerequisite — the MVP can skip it and still test the core edge. The main risk is the 36-month test window and the potential that the bear-market protection (which drives the Sharpe) depends critically on the 70/30 allocation being implemented correctly. But this is diagnosable in Phase 0.
+
 #### CANDIDATE L: Enhanced Cointegration Pairs Trading with Adaptive Trailing Stop + Volatility Filter
-- **Status:** CANDIDATE — surfaced in Sweep #4, not formally evaluated through the 7-point filter; **elevated in §4.4 (2026-04-06)** after J parking
+- **Status:** CANDIDATE — surfaced in Sweep #4; full-paper analysis completed 2026-04-07; **priority revised downward — see co-investigator note below**
 - **Source:** Palazzi (Journal of Futures Markets, Aug 2025, peer-reviewed) — "Trading Games: Beating Passive Strategies in the Bullish Crypto Market." Tadi & Witzany (Financial Innovation, 2025) — copula-based pairs on Binance Futures. IEEE Xplore (2020) — "Pairs Trading in Cryptocurrency Markets" (5-min frequency finding).
-- **Core idea:** Cointegrated pairs trading on 10 major cryptos, enhanced with: (1) dynamic trailing stop-loss adapting to spread's rolling volatility, (2) volatility filter suppressing entries during high-vol regimes, (3) systematic grid-search optimization of lookback period, (4) walk-forward validation.
-- **Why it's interesting for us:** Directly addresses both failure modes that killed our CointPairs (Candidate F): single-leg exposure (this is dual-leg) and trade frequency (IEEE paper shows 5-min frequency returns 11.61% monthly vs −0.07% for daily). Palazzi paper maintains positive performance across both bull and bear regimes. Our Phase 0 validation infrastructure (`cointpairs_phase0_validation.py`) is directly reusable.
-- **Potential concerns:** Requires dual-leg coordination in Freqtrade (same conditional pass as F criterion 3). Capital-intensive (two legs per trade). Palazzi paper uses daily data — need to validate at shorter timeframes. 5-min execution via Freqtrade standard execution may introduce slippage.
-- **Evaluation filter score:** Not formally scored — was held second-priority behind J. **J is now PARKED (Phase 0 NO-GO);** **L is elevated to the top paper-derived build candidate** among J/K/L until formally rescored. Would likely score 6/7 with conditional pass on Freqtrade compatibility (same as F). Pursue as **next major strategy research track** or concurrent diversification vs LiqCascade.
+- **Core idea:** Cointegrated pairs trading on 10 major cryptos, enhanced with: (1) dynamic trailing stop-loss (2.5%) adapting to spread's rolling volatility, (2) volatility filter (entry blocked when vol > 1.5× avg), (3) systematic grid-search optimization of lookback period (50–350 days), (4) walk-forward validation. Z-score entry threshold ±0.7 (vs standard ±2.0 — very aggressive, many signals at daily frequency).
 
-### 4.4 Current Priority Ranking (as of 2026-04-06)
+**Full-paper performance — Palazzi 2025 (daily data, Jan 2019–May 2024, LTC/DOGE best pair):**
 
-1. **Candidate L (Enhanced CointPairs)** — **Top paper-derived strategy queue item** after J's parking. Addresses both F failure modes (single-leg, frequency). Peer-reviewed (J. Futures Markets 2025). Dev plan: `EnhancedCointPairs_Dev_Plan.md`.
+| Strategy | Ann. Return | Sharpe | Calmar | MDD |
+|---|---|---|---|---|
+| Simple pairs (EGER) | 18% | 0.54 | — | — |
+| BTC Buy-and-Hold | 99% | 1.37 | — | — |
+| **Optimized (OOS, best pair)** | **71%** | **2.12** | **4.95** | **14%** |
 
-2. **Candidate G (Cross-Sectional Momentum)** — **PARKED.** Phase 1 complete; empirically weak. Code and docs retained. Reopen only per G's parking policy.
+**Regime breakdown (OOS, LTC/DOGE):**
 
-3. **Candidate K (Multi-Timeframe Trend)** — Filter/enhancement for **L**, LiqCascade, or future breakout/trend work — not standalone. *(No longer tied to an active J Phase 2.)*
+| Regime | Ann. Return | Sharpe | MDD |
+|---|---|---|---|
+| Bull (full OOS) | ~65% | 1.84 | ~14% |
+| Bear (full OOS) | ~80% | 2.24 | -8.55% |
 
-4. **Candidate J (Ensemble Donchian Trend-Following)** — **PARKED.** Phase 0 **NO-GO** (2026-04-06). MVP and docs retained for reference; see `EnsembleDonchianTrend_Deep_Dive.md`, `EnsembleDonchianTrend_Dev_Plan.md`, sweep results under `user_data/results/`. **7/7** = evaluation filter only.
+**Walk-forward stability (23 rolling windows, OOS):**
+- Sharpe range: -2.10 to +7.68 | Mean: 0.89 | Std Dev: 2.54 | Positive windows: ~60%
 
-5. **Candidate I (Signature-Enhanced Momentum)** — RESERVED. Prerequisites unchanged from 2026-03-29.
+**Lookback sensitivity (key operational risk):**
+- 50–100 day: best OOS returns; 90-day best OOS Sharpe
+- 350-day: best drawdown control (in-sample only; shows overfitting in OOS)
+- 300–360 day lookbacks: significant overfitting — long lookbacks unreliable
+- Minimal degradation regime: 30–60 day lookbacks (stable but lower return)
 
-6. **Candidates B (Funding Rate Arb), C (Vol Commonality), D (CNN Preprocessing)** — Parked. Unchanged.
+- **Critical findings from full-paper analysis (2026-04-07):**
+  - **Daily data only** — Palazzi uses CoinMarketCap daily prices. NOT intraday, NOT Binance futures. The 5-min frequency result (11.61%/month) came from the IEEE Xplore (2020) paper — a separate, older study. The two claims cannot be combined.
+  - **Single best pair** — LTC/DOGE was selected as best-performing from 37 cointegrated pairs. **Only 35% of those 37 pairs showed positive OOS returns.** The headline Sharpe 2.12 is the top survivor, not the portfolio average.
+  - **Walk-forward highly variable** — Std Dev 2.54 on Sharpe across windows. A strategy that is negative in 40% of rolling periods is operationally unreliable.
+  - **Extreme lookback sensitivity** — optimum shifts dramatically between IS and OOS. Grid search on IS to select lookback likely overfits. No adaptive lookback mechanism described.
+  - **Beta to BTC: -0.13** — low market exposure is real; diversification benefit confirmed.
+  - **Paper cites ~50% Sharpe decay post-publication** (Falck & Rej 2022). The peer-reviewed Sharpe 2.12 should be discounted accordingly.
+  - **Dual-leg coordination** — paper does not address simultaneous long/short execution in a real trading system. Implementation complexity on Freqtrade is unresolved (same blocker as Candidate F).
+
+- **Why it's still interesting:** Dual-leg architecture addresses CointPairs F single-leg failure. Bear-regime Sharpe (2.24) is genuinely attractive. Beta -0.13 offers real diversification. Phase 0 infrastructure (`cointpairs_phase0_validation.py`) is directly reusable. The Tadi & Witzany copula paper on Binance Futures is independent corroborating evidence.
+
+- **Potential concerns (updated):** 35% OOS success rate across pairs = strong selection bias. Daily frequency mismatches our operational stack (hourly/sub-hourly execution). Dual-leg Freqtrade architecture unresolved. Walk-forward Sharpe Std Dev 2.54 is too high for operational confidence. Lookback sensitivity requires adaptive mechanism not described in paper. 5-min frequency claim is from a different (2020) paper — cannot assume Palazzi's strategy works at intraday.
+
+- **Evaluation filter score (formal, 2026-04-07):**
+  - ✅ Real exchange data — Binance futures in Tadi; CoinMarketCap daily in Palazzi (daily mismatch noted)
+  - ✅ OOS validation — yes, walk-forward OOS in Palazzi
+  - ✅ Transaction costs — yes, included (daily rebalancing)
+  - ✅ Bear/Bull robustness — yes (bear Sharpe 2.24 > bull; confirmed)
+  - ✅ Existing infrastructure reuse — `cointpairs_phase0_validation.py` reusable
+  - ⚠️ Freqtrade compatibility — dual-leg coordination unresolved (same as F) — **CONDITIONAL**
+  - ❌ Frequency match — paper is daily; we need intraday. 5-min claim is separate paper; not validated in Palazzi's framework
+  - **Score: 5/7 with one conditional** (downgraded from preliminary 6/7 estimate — frequency mismatch is decisive)
+
+- **Co-investigator note (2026-04-07):** The full paper materially weakens the case for L. The headline Sharpe 2.12 is the best of 37 pairs; portfolio-level expected Sharpe at daily frequency is closer to 0.89 (walk-forward mean). The frequency gap (daily → intraday) is not bridged by Palazzi — it requires a separate body of work. With M offering a cleaner implementation path and L carrying unresolved architecture and selection-bias problems, **L should remain #2 but not be started until M's Phase 0 is complete.** If M passes Phase 0, reassess whether L's dual-leg complexity is worth pursuing. If M fails, L becomes the primary candidate — but the frequency validation step must be done first (backtest at 1h/4h before committing to implementation).
+
+### 4.4 Current Priority Ranking (as of 2026-04-07)
+
+1. **Candidate M (AdaptiveTrend)** — **Top build priority** as of Sweep #5 (2026-04-07). 6/7 evaluation filter. Cleanest stack-to-paper fit of any candidate to date. Pure OHLCV, ATR trailing stops (already in our stack), Freqtrade-native 6h timeframe, multi-pair. Applied history is decades of live momentum deployment. MVP skips portfolio construction complexity — signal + stops is a 3–4 day Phase 0. **Evaluate before committing to L** — simpler architecture, lower translation risk.
+
+2. **Candidate L (Enhanced CointPairs)** — Remains #2, but **priority revised downward after full-paper analysis (2026-04-07).** Palazzi paper is daily-only; headline Sharpe 2.12 is best-of-37 pairs (only 35% OOS success across pairs); walk-forward mean Sharpe 0.89, Std Dev 2.54. Frequency gap (daily → intraday) unresolved. Dual-leg Freqtrade architecture unresolved. Formal score: 5/7 + 1 conditional. **Do not start until M Phase 0 is complete.** If pursuing: frequency backtest (1h/4h) required before any implementation. Dev plan: `EnhancedCointPairs_Dev_Plan.md`.
+
+3. **Candidate K (Multi-Timeframe Trend)** — Filter/enhancement for M, L, LiqCascade, or future trend work — not standalone.
+
+4. **Candidate G (Cross-Sectional Momentum)** — **PARKED.** Reopen only per G's parking policy.
+
+5. **Candidate J (Ensemble Donchian Trend-Following)** — **PARKED.** Phase 0 NO-GO (2026-04-06).
+
+6. **Candidate I (Signature-Enhanced Momentum)** — RESERVED. Prerequisites unchanged.
+
+7. **Candidates B (Funding Rate Arb), C (Vol Commonality), D (CNN Preprocessing)** — Parked. Unchanged.
 
 *This ranking reflects the state of knowledge as of the date above. Update after any new sweep, evaluation, or project outcome.*
 
-**Queue history:** E archived (2026-03-23, backtest fail). G parked (2026-03-29, empirically weak). J promoted to #1 (2026-03-31, Sweep #4). **J parked (2026-04-06, Phase 0 NO-GO).** L elevated to #1 among paper queue.
+**Queue history:** E archived (2026-03-23, backtest fail). G parked (2026-03-29, empirically weak). J promoted to #1 (2026-03-31, Sweep #4). J parked (2026-04-06, Phase 0 NO-GO). L elevated to #1. **M promoted to #1 (2026-04-07, Sweep #5) — L drops to #2.**
 
 ---
 
@@ -565,6 +757,18 @@ Before committing to implement any candidate approach, score it on these criteri
 
 ### 7.4 Macro / Context Filters
 
+#### Funding Rate Extreme as Contrarian Entry Filter
+- **Status:** RESEARCH (surfaced in Sweep #5, 2026-04-07)
+- **What it does:** Uses extreme funding rate readings on perpetual futures as a directional bias filter. Extreme positive funding (>0.1%/8h sustained for 3+ periods) = crowded longs = elevated unwind risk → favour short entries or block long entries. Extreme negative funding = crowded shorts → favour long entries. Funding rate is paid every 8 hours on Binance; the rate reflects the long/short imbalance in open interest.
+- **Evidence:** Multiple independent sources (2022–2025): Inan (SSRN 5576424) confirms OOS predictability via DAR models. Coinbase Institutional / GSR research documents statistically significant negative returns following sustained high funding (>0.05%/8h for 3+ consecutive periods). Robot Wealth practitioner tests confirm it works as an entry gate on altcoins; weaker on BTC/ETH alone. Effect is non-linear — only meaningful in top/bottom decile readings.
+- **Critical nuance — Funding + OI is the best-documented configuration.** Funding rate alone is a moderate signal; funding rate z-score + simultaneous OI elevation is the strongest predictive combination in the literature (robot wealth, multiple SSRN papers 2023–2025). This directly validates our LiqCascade Phase 3.5 OI filter — adding a funding rate gate on top of OI is the evidence-based next step.
+- **Signal decay warning:** The cross-sectional funding sort (long lowest-funding assets, short highest-funding) is the most crowded version of this trade and shows degrading live Sharpe from 2024 onward (Quantpedia documented). The time-series contrarian signal (single-asset, extreme funding → block longs / favour shorts) is less crowded and more robust.
+- **Asset scope:** Works materially better on altcoins than BTC/ETH. BTC/ETH funding can stay elevated for weeks during strong trends without reverting. Apply threshold conservatively on BTC (e.g., 90th+ percentile rolling 30d rather than fixed 0.1%).
+- **Data sources:** Binance REST API (`GET /fapi/v1/fundingRate`) — free, no special tier. Poll every 8h by sidecar. OI from same endpoint (`GET /fapi/v1/openInterest`).
+- **How we'd use it:** Gate on top of existing entry conditions. LiqCascade: when a cascade signal fires AND funding is extreme-positive, short edge is amplified (crowded longs being squeezed + cascade = reinforcing). Block long cascade entries when funding is extreme-positive. OracleSurfer: block BULL entries when funding is at 90th+ percentile. AdaptiveTrend: weight short allocation higher when funding is elevated cross-sectionally.
+- **When to apply:** LiqCascade Phase 4 is the natural first application — add as a secondary gate after OI threshold is validated at the April 20 checkpoint.
+- **Relevant candidates:** LiqCascade (highest priority — Funding + OI joint gate), OracleSurfer (short entry filter), Candidate M/AdaptiveTrend (entry bias).
+
 #### On-Chain Whale Flow as Macro Filter
 - **Status:** RESEARCH (reclassified from Candidate H in Sweep #3)
 - **What it does:** Uses exchange inflow/outflow data, whale wallet accumulation/distribution patterns (via Glassnode Accumulation Trend Score or similar), and stablecoin supply changes as a directional bias filter. Not a trade signal — a context gate similar to the CRISIS gate but using on-chain data.
@@ -653,6 +857,29 @@ Before committing to implement any candidate approach, score it on these criteri
   - *Probabilistic Volatility Forecasting* (arXiv Aug 2025) — Ensemble of HAR/GARCH/ML for conditional vol quantiles. Forecasting framework, not trading strategy. Filed as potential position-sizing technique, similar to Candidate C.
   - *Copula-based crypto pairs trading* (Tadi & Witzany, Financial Innovation 2025) — Supporting evidence for Candidate L. Tested on Binance USDT-margined futures specifically. Outperforms standard cointegration and copula approaches. Integrated into L's evidence base.
 
+### Sweep #5
+- **Date:** 2026-04-07
+- **Focus:** Applied-history-first bias — strategies with practitioner deployment track records and classical foundations, enhanced with modern elements. Specifically avoiding approaches that fail the stack-translation test. Angles covered: VWAP mean reversion, Bollinger Band regime-switching, volatility breakout, funding rate as directional signal, ATR/momentum systems, multi-pair time-series momentum, single-asset mean reversion, RSI multi-pair.
+- **Sources checked:** arXiv (q-fin, Feb 2025–Feb 2026 — emphasis on OHLCV-native strategies), SSRN (targeted abstract retrieval), Quantpedia blog, QuantifiedStrategies.com, Robot Wealth (practitioner practitioner sources)
+- **Search terms used:** `VWAP mean reversion crypto futures strategy backtest profitable 2024 2025`, `funding rate signal directional crypto perpetual futures backtest 2024 2025`, `Bollinger Band squeeze volatility breakout crypto backtest 2024 2025`, `volatility regime switching trend mean reversion crypto systematic 2025`, `RSI oversold overbought multi-asset crypto systematic backtest 2025`, `crypto mean reversion single asset short-term 1h 4h SSRN`, `crypto breakout volatility contraction ML filter entry systematic 2025`, `time series momentum crypto short-term 6h systematic multi-pair 2025`
+- **Papers/sources reviewed:** ~35 sources scanned, ~10 read in detail
+- **Candidates surfaced:** 1 new (M)
+
+**Candidate M: AdaptiveTrend** — Bui & Nguyen (arXiv 2602.11708, Feb 2026). Rate-of-change momentum on 6h OHLCV across 150+ crypto pairs, with three portfolio construction enhancements: ATR dynamic trailing stops, monthly rolling-Sharpe pair selection, 70/30 asymmetric long-short allocation. Sharpe 2.41, Calmar 3.18, max DD -12.7% over 2022-2024. Only -4.2% in 2022 bear. Dramatically outperforms classical TSMOM benchmarks (Sharpe 0.65). Pure OHLCV signal; market cap filter needs daily CoinGecko. MVP simplification: skip monthly Sharpe selection, use fixed pair whitelist, implement signal + ATR stops in 3–4 days. **6/7 evaluation filter — PASS. Promoted to #1 build priority.**
+
+- **New technique added to §7.4:** Funding Rate Extreme as Contrarian Entry Filter (Inan, SSRN 5576424). DAR models confirm OOS predictability of funding rates on Binance/Bybit. Extreme positive funding = crowded longs = short bias amplifier. Applicable to LiqCascade, OracleSurfer, and AdaptiveTrend short entries.
+
+- **Top recommendation from Claude:** Candidate M before Candidate L. The stack translation argument is decisive: M's signal is arithmetic on OHLCV with an ATR trailing stop — both already proven in our stack. L's dual-leg coordination is an unresolved architecture problem that has blocked us once before. Run M Phase 0 first (3–4 days), then decide whether L is worth the coordination complexity.
+
+- **Notable papers reviewed but not promoted:**
+  - *Bollinger Bands under Varying Market Regimes* (Arda, SSRN 5775962, Nov 2025) — BTC/USDT July 2017–March 2022 (1m granularity, aggregated to 8 TFs). Long-only, no stop-loss, 0.075% fee. **1h breakout is profitable across all four regimes:** Bear +14.89% (Sharpe 0.36), Accumulation +22.10% (Sharpe 0.24), Bull Run +34.29% (Sharpe 0.87), Distribution +13.10% (Sharpe 0.33). Max drawdowns contained (10–20%). Mean reversion at 1h: only positive in Accumulation (+8.58%) and Bull Run (+78.41%) — fails in Bear (-67%) and Distribution (-11%). **Key finding: 1h breakout (price closes above upper band, exit at mid-band) is regime-agnostic at this timeframe — no macro filter required for long entries.** Short breakout (below lower band) not tested. Test window ends March 2022 — misses 2022 bear and 2024-25 bull. The author explicitly suggests ML regime classifiers to dynamically toggle between modes as future work — which is structurally what OracleSurfer already does. **Potential candidate:** adding short breakout entries (below lower band) + EMA200 macro filter to protect bear exposure would give a fully bidirectional, Freqtrade-native strategy with near-zero special data requirements. Not promoted to full candidate in this sweep — short-side performance unknown. Flag for Phase 0 consideration if AdaptiveTrend (Candidate M) Phase 0 produces a NO-GO.
+  - *Predictability of Funding Rates* (Inan, SSRN 5576424) — Filed as technique §7.4 (above).
+  - *Volume-Weighted TSMOM* (Huang, Sangiorgi & Urquhart, SSRN 4825389, 2024) — Volume-weighting the momentum signal shows strong recent crypto evidence. Supporting evidence for M's signal quality; could be a Phase 1 enhancement for AdaptiveTrend (weight momentum signal by volume).
+  - *Technical Analysis + ML on Bitcoin* (arXiv 2511.00665, Nov 2025) — LSTM achieves 65% cumulative return in < 1 year on BTC. Single asset, black-box architecture, not Freqtrade-native. Not promoted.
+  - *Volatility-Adaptive Trend-Following* (Karassavidis et al., SSRN 5821842) — Full text inaccessible (403). Title suggests volatility scaling on crypto trend-following — closely related to M's ATR-adaptive stop mechanism. If accessible, likely provides supporting evidence for M.
+  - *VWAP strategies* (QuantifiedStrategies/Zarattini SSRN 4631351) — VWAP mean reversion is well-tested on equities. Crypto application exists (arXiv 2502.13722 — deep learning for VWAP execution) but is focused on execution optimization, not alpha generation. No strong VWAP alpha evidence for crypto futures at the timeframes we target.
+  - *RSI on Bitcoin* (QuantifiedStrategies) — Practitioner finding: RSI mean-reversion (buying oversold dips) does NOT work on Bitcoin. RSI works better as momentum confirmation (consistent with our existing OracleSurfer entry filter). Reinforces existing architecture choices.
+
 ---
 
 ## 9. Lessons & Principles
@@ -689,6 +916,9 @@ Hard-won insights that apply across all approaches. Add to this as projects conc
 
 | Date | Change |
 |---|---|
+| 2026-04-07 | v4.1 — **Candidate L full-paper analysis (Palazzi 2025).** Entry significantly revised: formal 5/7+conditional score (downgraded from 6/7 estimate); performance table and walk-forward stats added; 35% OOS success rate across pairs flagged; frequency mismatch (daily-only) and daily/intraday separation from IEEE paper corrected; lookback sensitivity characterised; §4.4 L entry updated with revised rationale. |
+| 2026-04-07 | v4.0 — **Sweep #5 complete.** Candidate M (AdaptiveTrend, arXiv 2602.11708) surfaced and evaluated 6/7 PASS — promoted to **#1 build priority**. L drops to #2. Funding Rate Extreme added to §7.4 Techniques Library. §4.4 priority ranking updated. Sweep #5 logged. |
+| 2026-04-07 | v3.9 — **OracleSurfer added retroactively to §4.2 ACTIVE.** Project pre-dates this Research Log. Entry covers: v12 dry-run results (Feb 22–Apr 6, 8 trades, PF 0.31, -8.2%), root cause (asymmetric stop/reward requiring ~77% WR), v12→v14 structural overhaul (stop -10%→-5%, ROI ladder, DCA removed, 3yr training, regularization), and current deployment (v14, DigitalOcean droplet, `dry_run: true`, redeployed 2026-04-06 via git). Related files pointer added. |
 | 2026-04-06 | v3.8 — **J parking doc consistency:** `EnsembleDonchianTrend_Deep_Dive.md` **v1.5** — Part 10–12 + lessons table use **closed Phase 0** wording; file table **7/7 ≠ GO** note. `EnsembleDonchianTrend_Dev_Plan.md` artifact table Deep Dive **v1.5** + both Donchian docs **PARKED (reference)**. `EnhancedCointPairs_Dev_Plan.md` Phase 3 goal + **§7.4** reframed for **PARKED** J; footer updated. |
 | 2026-04-06 | v3.7 — **Candidate J (Ensemble Donchian) PARKED** — Phase 0 **NO-GO** after fee-inclusive backtests and `donchian_phase0_sweep` (see `user_data/results/donchian_phase0_sweep_*.md`). **§4.4** reordered: **L** elevated to top paper-queue item; **K** decoupled from J; J marked parked with artifact pointers. **§4.3** J status + co-investigator **2026-04-06** update (7/7 ≠ trading GO). **Sweep #4 log** top-recommendation line annotated. Related files list: **Deep Dive** added; Dev Plan marked PARKED. `EnsembleDonchianTrend_*` docs updated to PARKED. |
 | 2026-03-31 | v3.6 — **Sweep #4 completed.** 3 new candidates: **J (Ensemble Donchian Trend-Following)** evaluated **7/7 STRONG PASS** — promoted to #1 build priority; **K (Multi-Timeframe Trend)** filed as filter/enhancement; **L (Enhanced CointPairs)** held as second-priority. Sweep #1 Zarattini note updated (re-evaluated). Priority ranking updated. Dev plans created: `EnsembleDonchianTrend_Dev_Plan.md` (J) and `EnhancedCointPairs_Dev_Plan.md` (L). Related files updated. |
