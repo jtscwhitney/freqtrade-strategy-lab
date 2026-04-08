@@ -1,6 +1,6 @@
 # AlgoTrading Research Log
 ## Maintained by: [Developer] + Claude (any model)
-## Last Updated: 2026-04-07 (Sweep #5 complete — Candidate M promoted to #1)
+## Last Updated: 2026-04-08 (Candidate M Phase 0 V01 complete; V02 mid-cap expansion in progress)
 ## Stack: Cursor / Freqtrade / FreqAI / Claude Opus 4.6
 
 ---
@@ -43,7 +43,8 @@
 - `user_data/info/EnsembleDonchianTrend_Deep_Dive.md` — Candidate J deep dive (**PARKED** — implementation retained for reference)
 - `user_data/info/EnhancedCointPairs_Dev_Plan.md` — Candidate L development plan (NEW)
 - `user_data/info/EnhancedCointPairs_Deep_Dive.md` — Candidate L deep dive (ACTIVE; mirrored in `freqtrade-coint-pairs-trading`)
-- `user_data/info/AdaptiveTrend_Dev_Plan.md` — Candidate M development plan (ACTIVE — Phase 0 not yet started)
+- `user_data/info/AdaptiveTrend_Dev_Plan.md` — Candidate M development plan (ACTIVE — Phase 0 V02 in progress)
+- `user_data/info/AdaptiveTrend_Deep_Dive.md` — Candidate M deep dive (ACTIVE — created 2026-04-08)
 - OracleSurfer strategy — in `Freqtrade` repo (separate): `user_data/strategies/OracleSurfer_v14_PROD.py` (ACTIVE dry-run on DigitalOcean droplet)
 
 **Research & Development Workflow:**
@@ -427,7 +428,7 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Evaluation filter score:** Not formally scored — recommended as technique/filter rather than standalone strategy. If applied as a filter to a **multi-timeframe trend or breakout** design, it adds little data cost, no ML, and addresses Lesson #4 directly.
 
 #### CANDIDATE M: AdaptiveTrend — Systematic Multi-Pair Momentum with Adaptive Portfolio Construction
-- **Status:** CANDIDATE — surfaced in Sweep #5 (2026-04-07); **#1 build priority** (§4.4); **Dev Plan created 2026-04-07** (`AdaptiveTrend_Dev_Plan.md`); Phase 0 not yet started
+- **Status:** ACTIVE — Phase 0 in progress (2026-04-08). V01 (15 large-cap pairs) fully tested; V02 (61-pair mid-cap expansion) built, data download pending. Deep Dive: `AdaptiveTrend_Deep_Dive.md`
 - **Source:** Bui & Nguyen (arXiv 2602.11708, February 2026) — "Systematic Trend-Following with Adaptive Portfolio Construction: Enhancing Risk-Adjusted Alpha in Cryptocurrency Markets"
 - **Core idea:** Pure rate-of-change momentum signal (`(P_t - P_{t-L}) / P_{t-L}`) on 6h candlesticks across 150+ crypto pairs. Three enhancements over classical TSMOM: (1) ATR-calibrated dynamic trailing stops (`stop = max(prior_stop, price - 2.5×ATR)`), (2) monthly rolling-Sharpe-based pair selection (enter only pairs achieving SR ≥ 1.3 for longs / 1.7 for shorts on prior month's data), (3) 70/30 asymmetric long-short allocation grounded in crypto's empirical upward drift.
 - **Why it's interesting for us:** This directly addresses the recurring translation failure in prior sweeps. The signal is pure OHLCV rate-of-change — no ML model, no sidecar, no special data feed. The trailing stop mechanism is essentially identical to what LiqCascade already uses (ATR-based). The multi-pair architecture satisfies our trading frequency objective. The 70/30 allocation provides bear-market protection without going delta-neutral. Classical time-series momentum has decades of live practitioner deployment across asset classes; the portfolio construction enhancements are the modern element. The applied history criterion is strongly satisfied.
@@ -539,6 +540,33 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 **Co-investigator assessment:** This is the cleanest stack-to-paper fit we've seen since LiqCascade. The signal is a single arithmetic formula. The exit mechanism is already proven in our stack. The multi-pair architecture is native Freqtrade. The applied history criterion — which the user specifically requested for Sweep #5 — is as strong as it gets: rate-of-change momentum has been deployed in live funds for decades. The novel element (portfolio construction layer) is an enhancement, not a prerequisite — the MVP can skip it and still test the core edge. The main risk is the 36-month test window and the potential that the bear-market protection (which drives the Sharpe) depends critically on the 70/30 allocation being implemented correctly. But this is diagnosable in Phase 0.
 
+---
+
+**PHASE 0 RESULTS — V01 (15 large-cap pairs, 2026-04-08)**
+
+| Run | can_short | ATR_MULT | Timerange | PF | Total % | Notes |
+|-----|-----------|----------|-----------|-----|---------|-------|
+| Full period | False | 2.5 | 2022–2025 | 0.81 | −42.2% | Phase 0 FAIL; long-only stop trigger hit |
+| 2022 bear | False | 2.5 | 2022–2023 | 0.59 | −43.5% | Market −69.5%; structural failure expected |
+| 2023 | False | 2.5 | 2023–2024 | 1.08 | +8.3% | Market +179%; signal alive but alpha bleed severe |
+| 2024 bull | False | 2.5 | 2024–2025 | 0.95 | −5.6% | Market +64.5%; FAIL |
+| Full period | False | 3.5 | 2022–2025 | 0.95 | −10.3% | ATR_MULT=3.5 confirmed better; avg winner doubled |
+| Full period | True | 3.5 | 2022–2025 | **1.07** | **+23.4%** | Long −3.2% / Short +26.6%; short carried profit |
+
+**V01 Key Findings:**
+- **Long signal structurally weak on large-cap pairs.** Win rate stable at 31–33% across all regimes and ATR_MULT values — determined by the signal, not the stop. PF < 1.0 long-only in 3/3 full-period tests means the signal has insufficient edge on large-cap crypto at 6h/6-day horizon (too efficiently priced).
+- **ATR_MULT=3.5 empirically better than paper default 2.5.** At 2.5, avg winner duration 8d 11h; at 3.5, 16d 5h. Best single trade improved from +127% to +312%. The paper's 2.5 was cutting trends before maturity in our universe.
+- **Short leg carried all profit.** Long+short at ATR_MULT=3.5: longs (758 trades) −3.16%, shorts (270 trades) +26.60%. The 6 liquid large-cap shorts perform strongly; the 15 long positions are a net drag.
+- **2023 was not sideways — it was bullish (+179%).** The strategy captured only 8.3% of that move on the long side. This confirms the alpha bleed is structural, not a bear-market artefact.
+
+**V01 Conclusion:** Paper's claimed SR 2.41 almost certainly depends on mid/small-cap pairs (135 of the 150 in the universe). Our 15 large-caps are the worst-case subset. Long-only gate failed; strategy did not pass Phase 0 with V01 parameters on large-caps alone.
+
+**V02 Hypothesis (pending test):** Expand to 61 pairs (top-15 + 46 established mid-caps). If mid-cap pairs exhibit stronger momentum (shorter price discovery, retail-driven trends), long-side PF should improve materially. `AdaptiveTrendStrategy_V02.py` + `config_adaptivetrend_v2.json` built 2026-04-08. Data download pending. Fee set to 0.001 (10bps round-trip) for mid-cap spread realism. Survivorship bias caveat noted — V02 results are upper-bound estimates.
+
+**Next session:** download-data → V02 long-only full period + regime splits → enable shorts → GO/NO-GO decision.
+
+---
+
 #### CANDIDATE L: Enhanced Cointegration Pairs Trading with Adaptive Trailing Stop + Volatility Filter
 - **Status:** CANDIDATE — surfaced in Sweep #4; full-paper analysis completed 2026-04-07; **priority revised downward — see co-investigator note below**
 - **Source:** Palazzi (Journal of Futures Markets, Aug 2025, peer-reviewed) — "Trading Games: Beating Passive Strategies in the Bullish Crypto Market." Tadi & Witzany (Financial Innovation, 2025) — copula-based pairs on Binance Futures. IEEE Xplore (2020) — "Pairs Trading in Cryptocurrency Markets" (5-min frequency finding).
@@ -593,9 +621,9 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 - **Co-investigator note (2026-04-07):** The full paper materially weakens the case for L. The headline Sharpe 2.12 is the best of 37 pairs; portfolio-level expected Sharpe at daily frequency is closer to 0.89 (walk-forward mean). The frequency gap (daily → intraday) is not bridged by Palazzi — it requires a separate body of work. With M offering a cleaner implementation path and L carrying unresolved architecture and selection-bias problems, **L should remain #2 but not be started until M's Phase 0 is complete.** If M passes Phase 0, reassess whether L's dual-leg complexity is worth pursuing. If M fails, L becomes the primary candidate — but the frequency validation step must be done first (backtest at 1h/4h before committing to implementation).
 
-### 4.4 Current Priority Ranking (as of 2026-04-07)
+### 4.4 Current Priority Ranking (as of 2026-04-08)
 
-1. **Candidate M (AdaptiveTrend)** — **Top build priority** as of Sweep #5 (2026-04-07). 6/7 evaluation filter. Cleanest stack-to-paper fit of any candidate to date. Pure OHLCV, ATR trailing stops (already in our stack), Freqtrade-native 6h timeframe, multi-pair. Applied history is decades of live momentum deployment. MVP skips portfolio construction complexity — signal + stops is a 3–4 day Phase 0. **Evaluate before committing to L** — simpler architecture, lower translation risk.
+1. **Candidate M (AdaptiveTrend)** — **ACTIVE Phase 0.** V01 (15 large-caps) fully tested: long-only FAIL (PF 0.81), long+short PF 1.07 at ATR_MULT=3.5 but short leg carried everything. V02 (61 pairs, mid-cap expansion) built; data download + backtests pending next session. Decision gate: if V02 long-only achieves PF > 1.0 in ≥ 2/3 regime years → continue to 3×3 L×θ grid; otherwise archive. See Phase 0 results block above and `AdaptiveTrend_Deep_Dive.md`.
 
 2. **Candidate L (Enhanced CointPairs)** — Remains #2, but **priority revised downward after full-paper analysis (2026-04-07).** Palazzi paper is daily-only; headline Sharpe 2.12 is best-of-37 pairs (only 35% OOS success across pairs); walk-forward mean Sharpe 0.89, Std Dev 2.54. Frequency gap (daily → intraday) unresolved. Dual-leg Freqtrade architecture unresolved. Formal score: 5/7 + 1 conditional. **Do not start until M Phase 0 is complete.** If pursuing: frequency backtest (1h/4h) required before any implementation. Dev plan: `EnhancedCointPairs_Dev_Plan.md`.
 
@@ -916,6 +944,7 @@ Hard-won insights that apply across all approaches. Add to this as projects conc
 
 | Date | Change |
 |---|---|
+| 2026-04-08 | v4.2 — **Candidate M Phase 0 V01 complete; V02 mid-cap expansion built.** M status updated to ACTIVE. Phase 0 results block added: 6 backtest runs (V01, 15 large-caps), ATR_MULT sensitivity (2.5→3.5), long/short split diagnosis. Key finding: long signal weak on large-caps; short leg carries profit; V02 mid-cap expansion (61 pairs) is the diagnostic test. `AdaptiveTrend_Deep_Dive.md` created. §4.4 M entry updated with Phase 0 status and next-session gate. Related files list updated. |
 | 2026-04-07 | v4.1 — **Candidate L full-paper analysis (Palazzi 2025).** Entry significantly revised: formal 5/7+conditional score (downgraded from 6/7 estimate); performance table and walk-forward stats added; 35% OOS success rate across pairs flagged; frequency mismatch (daily-only) and daily/intraday separation from IEEE paper corrected; lookback sensitivity characterised; §4.4 L entry updated with revised rationale. |
 | 2026-04-07 | v4.0 — **Sweep #5 complete.** Candidate M (AdaptiveTrend, arXiv 2602.11708) surfaced and evaluated 6/7 PASS — promoted to **#1 build priority**. L drops to #2. Funding Rate Extreme added to §7.4 Techniques Library. §4.4 priority ranking updated. Sweep #5 logged. |
 | 2026-04-07 | v3.9 — **OracleSurfer added retroactively to §4.2 ACTIVE.** Project pre-dates this Research Log. Entry covers: v12 dry-run results (Feb 22–Apr 6, 8 trades, PF 0.31, -8.2%), root cause (asymmetric stop/reward requiring ~77% WR), v12→v14 structural overhaul (stop -10%→-5%, ROI ladder, DCA removed, 3yr training, regularization), and current deployment (v14, DigitalOcean droplet, `dry_run: true`, redeployed 2026-04-06 via git). Related files pointer added. |

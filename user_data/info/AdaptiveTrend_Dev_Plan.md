@@ -1,7 +1,7 @@
 # AdaptiveTrend — Development Plan
 ## Candidate M from AlgoTrading Research Log
-## Created: 2026-04-07 | Last updated: 2026-04-07
-## STATUS: ACTIVE — Phase 0 (not yet started)
+## Created: 2026-04-07 | Last updated: 2026-04-08
+## STATUS: ACTIVE — Phase 0 (V02 mid-cap expansion; data download pending)
 
 ---
 
@@ -24,7 +24,7 @@ Systematic multi-pair momentum strategy (rate-of-change signal) on **6h candlest
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **0** | **NOT STARTED** | Fee-inclusive backtest + regime splits on fixed params |
+| **0** | **IN PROGRESS** | V01 complete (15 large-caps): long-only FAIL (PF 0.81), short leg carried profit (PF 1.07 long+short). V02 built: 61-pair mid-cap expansion. Data download + V02 backtests pending. |
 | **1** | Pending Phase 0 GO | Add rolling Sharpe-based pair selection (monthly optimization) |
 | **2** | Pending Phase 1 GO | Hyperopt on core parameters |
 | **3** | Pending Phase 2 GO | Dry-run deployment |
@@ -36,6 +36,31 @@ Systematic multi-pair momentum strategy (rate-of-change signal) on **6h candlest
 **Timeframe is 6h, not 4h, not 8h.** The paper tested H1/H4/H6/H8/D1 explicitly. H6 is optimal (SR 2.41). H4 is second (SR 2.08). H8 is third (SR 2.18). H1 significantly worse (SR 1.54). Do not deviate to H4 unless H6 produces no signal on Binance due to data availability issues.
 
 **Fee sensitivity:** Paper baseline is 4 bps/trade. Our cost is 5 bps/side = 10 bps round-trip. Paper sensitivity table: 8 bps → SR 2.01, 12 bps → SR 1.62. At our 10 bps: estimated SR ~1.85. With fixed params (no monthly opt): adjust down further. Phase 0 must use `--fee 0.0005` throughout.
+
+---
+
+## Phase 0 Results Log (2026-04-08)
+
+### V01 — 15 large-cap pairs
+
+| Run | can_short | ATR_MULT | Timerange | PF | Total % | Notes |
+|-----|-----------|----------|-----------|-----|---------|-------|
+| Full period | False | 2.5 | 2022–2025 | 0.81 | −42.2% | Stop trigger: long-only loses money |
+| 2022 bear | False | 2.5 | 2022–2023 | 0.59 | −43.5% | Market −69.5% |
+| 2023 | False | 2.5 | 2023–2024 | 1.08 | +8.3% | Market +179%; massive alpha bleed |
+| 2024 bull | False | 2.5 | 2024–2025 | 0.95 | −5.6% | Market +64.5% |
+| Full period | False | 3.5 | 2022–2025 | 0.95 | −10.3% | ATR_MULT 3.5 confirmed better |
+| Full period | True | 3.5 | 2022–2025 | 1.07 | +23.4% | Long −3.2% / Short +26.6% |
+
+**V01 diagnosis:** Long signal weak on large-cap pairs regardless of ATR_MULT. Short leg (6 pairs) carried all profit. ATR_MULT=3.5 empirically better than paper default 2.5. Hypothesis: paper edge lives in mid/small-cap pairs.
+
+### V02 — 61 pairs (top-15 + 46 mid-caps), ATR_MULT=3.5
+
+Files: `AdaptiveTrendStrategy_V02.py`, `config/config_adaptivetrend_v2.json`
+
+**Data download NOT yet run (session ended before this step).**
+
+Next session: run download, then V02 long-only full-period (fee 0.001 for mid-cap spread realism), then regime splits, then enable shorts.
 
 ---
 
@@ -217,10 +242,12 @@ OOS validation on 2024 data after hyperopt — must not show significant degrada
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `user_data/strategies/AdaptiveTrendStrategy_V01.py` | Phase 0 MVP — ROC + ATR trailing | **To build** |
-| `config/config_adaptivetrend.json` | Futures whitelist, H6, fee config | **To build** |
+| `user_data/strategies/AdaptiveTrendStrategy_V01.py` | 15-pair large-cap MVP — COMPLETE; can_short=True ATR_MULT=3.5 (last state) | **Built + tested** |
+| `config/config_adaptivetrend.json` | 15-pair whitelist, port 8087 | **Built** |
+| `user_data/strategies/AdaptiveTrendStrategy_V02.py` | 61-pair mid-cap expansion — can_short=False ATR_MULT=3.5 | **Built; awaiting data+backtest** |
+| `config/config_adaptivetrend_v2.json` | 61-pair whitelist, port 8088, max_open_trades=37 | **Built** |
 | `user_data/info/AdaptiveTrend_Dev_Plan.md` | THIS FILE | Created 2026-04-07 |
-| `user_data/info/AdaptiveTrend_Deep_Dive.md` | Technical deep dive | Created on Phase 0 GO |
+| `user_data/info/AdaptiveTrend_Deep_Dive.md` | Technical deep dive | **Created 2026-04-08** |
 
 ---
 
