@@ -1,5 +1,5 @@
 # AdaptiveTrend Strategy (Candidate M) — Deep Dive
-## Version 1 | Started: 2026-04-08 | Status: ACTIVE — Phase 0 (V02 mid-cap expansion, data download pending)
+## Version 2 | Started: 2026-04-08 | Last updated: 2026-04-09 | Status: ARCHIVED — Phase 0 NO-GO
 
 ---
 
@@ -10,11 +10,16 @@
 
 ### Current Status
 
+**ARCHIVED — Phase 0 NO-GO (2026-04-09)**
+
 | Item | State |
 |------|-------|
-| **Phase 0 — V01** | **COMPLETE** — 15 large-cap pairs fully tested. Long-only FAIL (PF 0.81). Long+short marginally profitable (PF 1.07, ATR_MULT=3.5) but short leg carried everything. Long signal structurally weak on large-caps. |
-| **Phase 0 — V02** | **IN PROGRESS** — 61-pair universe (top-15 + 46 mid-caps) built. `AdaptiveTrendStrategy_V02.py` + `config_adaptivetrend_v2.json` created. **Data download not yet run.** |
-| **Phase 1–3** | Pending Phase 0 GO. |
+| **Phase 0 — V01** | **COMPLETE** — 15 large-cap pairs. Long-only FAIL (PF 0.81). Long+short PF 1.07 — short leg carried everything. |
+| **Phase 0 — V02** | **COMPLETE** — 61 pairs. Long-only PF 0.63, −74.4%. Mid-cap expansion worsened results. |
+| **Phase 0 — V03** | **COMPLETE** — 57 pairs + EMA(100) filter + 72-bar lookback + ATR-norm entry + momentum exit. PF 0.69, −62.2%. Momentum exit churned trades. Archived. |
+| **Phase 1–3** | CANCELLED — Phase 0 failed. |
+
+**Short leg salvaged as Candidate N (ShortBias Momentum).** See Research Log §4.3.
 
 ### V01 Results Summary
 
@@ -29,34 +34,24 @@
 
 Long/short split at ATR_MULT=3.5: **Longs 758 trades −3.16% / Shorts 270 trades +26.60%**
 
-### Next Session — Exact Commands
+### Archive Summary (2026-04-09)
 
-**Step 1 — Download mid-cap data (not yet run):**
-```
-docker compose run --rm freqtrade download-data --config /freqtrade/config/config_adaptivetrend_v2.json --timerange 20210701-20260408 --timeframes 6h --trading-mode futures
-```
+All three long-only iterations failed. Long-side momentum signal has no consistent edge in this universe over the 2022–2025 test period. Candidate M is archived.
 
-**Step 2 — V02 long-only full period:**
-```
-docker compose run --rm freqtrade backtesting --config /freqtrade/config/config_adaptivetrend_v2.json --strategy AdaptiveTrendStrategy_V02 --timerange 20220101-20250101 --timeframe 6h --fee 0.001 --cache none
-```
-
-**Step 3 — Regime splits** (if Step 2 PF > 1.0, run 2022/2023/2024 ranges).
-
-**Step 4 — Enable shorts** (`can_short = True` in V02), repeat Steps 2+3.
-
-**Decision gate:** If V02 long-only achieves PF > 1.0 in ≥ 2/3 regime years → continue to 3×3 L×θ grid. Otherwise → archive.
+**Next action:** Candidate N (ShortBias Momentum) — run V01 regime splits (can_short=True) to evaluate the short leg in isolation across 2022/2023/2024 regimes.
 
 ### File Locations
 
 | File | Status | Purpose |
 |------|--------|---------|
-| `user_data/info/AdaptiveTrend_Deep_Dive.md` | **THIS FILE** | Technical reference |
-| `user_data/info/AdaptiveTrend_Dev_Plan.md` | Active | Phase plan, gates, anti-patterns, results log |
-| `user_data/strategies/AdaptiveTrendStrategy_V01.py` | Complete | 15-pair large-cap MVP; can_short=True, ATR_MULT=3.5 (last test state) |
-| `user_data/strategies/AdaptiveTrendStrategy_V02.py` | Built; awaiting backtest | 61-pair mid-cap expansion; can_short=False, ATR_MULT=3.5 |
-| `config/config_adaptivetrend.json` | Complete | 15-pair whitelist, port 8087 |
-| `config/config_adaptivetrend_v2.json` | Built | 61-pair whitelist, port 8088, max_open_trades=37 |
+| `user_data/info/AdaptiveTrend_Deep_Dive.md` | **THIS FILE (ARCHIVED)** | Technical reference |
+| `user_data/info/AdaptiveTrend_Dev_Plan.md` | ARCHIVED | Phase plan, gates, anti-patterns, results log |
+| `user_data/strategies/AdaptiveTrendStrategy_V01.py` | Reference | 15-pair large-cap MVP; can_short=True, ATR_MULT=3.5 — reuse for Candidate N |
+| `user_data/strategies/AdaptiveTrendStrategy_V02.py` | Reference (FAIL PF 0.63) | 61-pair mid-cap expansion; can_short=False, ATR_MULT=3.5 |
+| `user_data/strategies/AdaptiveTrendStrategy_V03.py` | Reference (FAIL PF 0.69) | 57-pair; EMA filter + 72-bar lookback + ATR-norm entry |
+| `config/config_adaptivetrend.json` | Reference | 15-pair whitelist, port 8087 |
+| `config/config_adaptivetrend_v2.json` | Reference | 61-pair whitelist, port 8088 |
+| `config/config_adaptivetrend_v3.json` | Reference | 61-pair whitelist, port 8089 |
 
 ---
 
@@ -192,11 +187,27 @@ Market context confirms the signal is regime-conditional: 2023 at ATR_MULT=2.5 p
 
 This asymmetry is the key finding of V01. The strategy as designed is not a symmetric bidirectional momentum strategy on large-caps — it is effectively a short-carry strategy with a losing long component. The paper's claimed bidirectional edge almost certainly comes from the 135+ mid/small-cap pairs that generate stronger long-side momentum.
 
-### 4.4 V02 hypothesis (not yet tested)
+### 4.4 V02 results (2026-04-09)
 
-If mid/small-cap pairs have stronger ROC momentum (shorter price discovery, more retail-driven trends), the long-side PF should improve materially. The null hypothesis is that V02 long-only achieves PF > 1.0 on the full period. If confirmed, Phase 0 continues to the 3×3 L×θ grid.
+**PF 0.63, −74.4%, 2,411 trades, 27.2% WR, avg hold 8.5 days.**
 
-**Survivorship bias caveat:** V02 pairs are selected from those active on Binance futures today. Pairs that were delisted (e.g., due to low liquidity, project failure) are excluded. This inflates backtest performance for mid-caps relative to what was achievable in real time. V02 results should be treated as an upper-bound estimate and weighted accordingly. Running at 10bps fee (`--fee 0.001`) rather than 5bps partially compensates by modelling realistic mid-cap spread costs.
+Mid-cap expansion made things materially worse. Only 11/61 pairs achieved PF > 1.0. Best: ZIL (PF 1.93), APT (PF 1.84), HBAR (PF 1.40), RUNE (implicitly via V03). Worst: DYDX (PF 0.27), ONE (PF 0.11), GRT (PF 0.30), XTZ (PF 0.03). The hypothesis that mid-caps exhibit stronger momentum was falsified — in 2022–2025, they were assets in secular downtrends with no recovery, not momentum vehicles.
+
+Survivorship bias note: all pairs selected are still active on Binance futures. Delisted pairs are excluded — these results are an upper-bound estimate.
+
+### 4.5 V03 results (2026-04-09)
+
+**PF 0.69, −62.2%, 2,639 trades, 28.0% WR, avg hold 5.4 days.**
+
+Changes: EMA(100) trend filter, MOM_LOOKBACK 24→72, ATR-normalized entry (replaces fixed 3%), 4 worst pairs pruned (DYDX/ONE/GRT/XTZ), momentum exit (`mom < 0` exits longs).
+
+The momentum exit backfired: trade count increased (2,411→2,639), hold time dropped (8.5→5.4d). EMA(100) on 6h (= 25 days) is too responsive to function as a genuine regime filter in crypto — whipsaws frequently. The ATR-normalized entry reduced some bad entries but couldn't compensate for structurally weak long signal across 40+ pairs with no trending structure.
+
+### 4.6 Phase 0 archive diagnosis
+
+All three versions failed. The long signal does not work in this universe over this period. The paper's strategy likely works because of: (1) monthly Sharpe rotation that eliminates non-performing pairs dynamically, (2) a 150+ pair universe where a small number of strong-momentum pairs drive returns while the rest are excluded in rotation, (3) test period coverage that may coincide with more favorable conditions for specific pairs. Our fixed-whitelist, fixed-parameter implementation cannot replicate this dynamic selection effect.
+
+**Short leg survival:** The V01 short leg (+26.6%, 270 trades, 6 pairs) is a different thesis. Candidate N investigates it as a standalone.
 
 ---
 

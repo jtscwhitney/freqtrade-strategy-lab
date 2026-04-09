@@ -1,6 +1,6 @@
 # AlgoTrading Research Log
 ## Maintained by: [Developer] + Claude (any model)
-## Last Updated: 2026-04-08 (Candidate M Phase 0 V01 complete; V02 mid-cap expansion in progress)
+## Last Updated: 2026-04-09 (Candidate M ARCHIVED — Phase 0 NO-GO after V01/V02/V03 long-only failures; Candidate N (ShortBias Momentum) added)
 ## Stack: Cursor / Freqtrade / FreqAI / Claude Opus 4.6
 
 ---
@@ -43,8 +43,9 @@
 - `user_data/info/EnsembleDonchianTrend_Deep_Dive.md` — Candidate J deep dive (**PARKED** — implementation retained for reference)
 - `user_data/info/EnhancedCointPairs_Dev_Plan.md` — Candidate L development plan (NEW)
 - `user_data/info/EnhancedCointPairs_Deep_Dive.md` — Candidate L deep dive (ACTIVE; mirrored in `freqtrade-coint-pairs-trading`)
-- `user_data/info/AdaptiveTrend_Dev_Plan.md` — Candidate M development plan (ACTIVE — Phase 0 V02 in progress)
-- `user_data/info/AdaptiveTrend_Deep_Dive.md` — Candidate M deep dive (ACTIVE — created 2026-04-08)
+- `user_data/info/AdaptiveTrend_Dev_Plan.md` — Candidate M development plan (**ARCHIVED** — Phase 0 NO-GO 2026-04-09)
+- `user_data/info/AdaptiveTrend_Deep_Dive.md` — Candidate M deep dive (**ARCHIVED** — Phase 0 NO-GO 2026-04-09)
+- `user_data/info/ShortBiasMomentum_Dev_Plan.md` — Candidate N development plan (PENDING — not yet created)
 - OracleSurfer strategy — in `Freqtrade` repo (separate): `user_data/strategies/OracleSurfer_v14_PROD.py` (ACTIVE dry-run on DigitalOcean droplet)
 
 **Research & Development Workflow:**
@@ -216,6 +217,33 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Forward test:** Not run (per plan: skip when backtests decisively fail).
 - **Reusable infrastructure:** `Dockerfile.freqtrade`, `config/config_pathsignatures_V01.json`, `docker-compose.pathsignatures.yml`; strategy retained as reference only.
 - **Deep dive:** `PathSignatureLeadLag_Deep_Dive.md` (ARCHIVED)
+
+---
+
+#### CANDIDATE M: AdaptiveTrend — Systematic Multi-Pair Momentum with Adaptive Portfolio Construction
+- **Status:** ARCHIVED (2026-04-09) — Phase 0 NO-GO; long-only signal unprofitable across all three iterations
+- **Duration:** 2 days development + 3 strategy versions (V01: 15 large-caps, V02: 61 pairs, V03: 57 pairs + regime filter)
+- **Source:** Bui & Nguyen (arXiv 2602.11708) — rate-of-change momentum on 150+ pairs with ATR trailing stop and monthly Sharpe-based pair selection
+- **What worked:**
+  - **Short leg (6 liquid large-caps, V01): +26.6% over 2022–2025** at ATR_MULT=3.5 — the short signal is real and the basis for Candidate N
+  - ATR trailing stop architecture (custom_stoploss pattern) works correctly; ATR_MULT=3.5 empirically better than paper's 2.5 (avg winner 8d → 16d)
+  - Infrastructure (multi-pair futures, concurrent slot management, `_row_at()` pattern) is reusable
+- **Phase 0 results — long-only leg (all failed):**
+
+  | Version | Pairs | Changes | PF | Return | Win Rate | Trades |
+  |---------|-------|---------|-----|--------|----------|--------|
+  | V01 | 15 large-caps | ATR_MULT=3.5, baseline | 0.81 | −42.2% | 31% | ~900 |
+  | V02 | 61 pairs | +46 mid-caps | 0.63 | −74.4% | 27.2% | 2,411 |
+  | V03 | 57 pairs | EMA(100) filter + MOM_LOOKBACK 24→72 + ATR-norm entry + mom exit | 0.69 | −62.2% | 28.0% | 2,639 |
+
+- **Why it failed:**
+  1. **Test period bias:** 2022–2025 included crypto's worst bear market. Most mid/small-cap altcoins peaked Nov 2021 and spent 2022–2024 in secular downtrends — a momentum long signal enters falling knives even with trend filters at 6h resolution.
+  2. **Universe degraded with expansion:** Mid-cap tokens (DYDX, ONE, GRT, XTZ, THETA, ENJ) had catastrophically poor long-side PF even after adding a 25-day EMA filter. Deeper trend filters (daily EMA, weekly MA) were not tested before archiving.
+  3. **Momentum exit signal backfired in V03:** Adding `mom < 0` exit increased churn (trade count up 2,411 → 2,639, hold time down 8.5d → 5.4d) — churned positions without improving signal quality.
+  4. **Paper's SR 2.41 depends on 150+ pair universe + monthly Sharpe rotation (+1.07 SR).** Fixed whitelist is structurally disadvantaged.
+- **Key salvageable element:** Short-only leg — basis for Candidate N (ShortBias Momentum). Full Phase 0 candidate entry in §4.3.
+- **Reusable infrastructure:** `AdaptiveTrendStrategy_V01/V02/V03.py` — ATR trailing stop, concurrent slot management, `_row_at()`. Directly reusable for Candidate N.
+- **Dev plan:** `AdaptiveTrend_Dev_Plan.md` (ARCHIVED) | **Deep dive:** `AdaptiveTrend_Deep_Dive.md` (ARCHIVED)
 
 ---
 
@@ -428,7 +456,7 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 - **Evaluation filter score:** Not formally scored — recommended as technique/filter rather than standalone strategy. If applied as a filter to a **multi-timeframe trend or breakout** design, it adds little data cost, no ML, and addresses Lesson #4 directly.
 
 #### CANDIDATE M: AdaptiveTrend — Systematic Multi-Pair Momentum with Adaptive Portfolio Construction
-- **Status:** ACTIVE — Phase 0 in progress (2026-04-08). V01 (15 large-cap pairs) fully tested; V02 (61-pair mid-cap expansion) built, data download pending. Deep Dive: `AdaptiveTrend_Deep_Dive.md`
+- **Status:** **ARCHIVED (2026-04-09) — Phase 0 NO-GO. See §4.1 for full post-mortem.** Long-only signal failed across V01 (PF 0.81), V02 (PF 0.63), V03 (PF 0.69). Short leg profitable (+26.6%) — see Candidate N. Deep Dive: `AdaptiveTrend_Deep_Dive.md` (ARCHIVED)
 - **Source:** Bui & Nguyen (arXiv 2602.11708, February 2026) — "Systematic Trend-Following with Adaptive Portfolio Construction: Enhancing Risk-Adjusted Alpha in Cryptocurrency Markets"
 - **Core idea:** Pure rate-of-change momentum signal (`(P_t - P_{t-L}) / P_{t-L}`) on 6h candlesticks across 150+ crypto pairs. Three enhancements over classical TSMOM: (1) ATR-calibrated dynamic trailing stops (`stop = max(prior_stop, price - 2.5×ATR)`), (2) monthly rolling-Sharpe-based pair selection (enter only pairs achieving SR ≥ 1.3 for longs / 1.7 for shorts on prior month's data), (3) 70/30 asymmetric long-short allocation grounded in crypto's empirical upward drift.
 - **Why it's interesting for us:** This directly addresses the recurring translation failure in prior sweeps. The signal is pure OHLCV rate-of-change — no ML model, no sidecar, no special data feed. The trailing stop mechanism is essentially identical to what LiqCascade already uses (ATR-based). The multi-pair architecture satisfies our trading frequency objective. The 70/30 allocation provides bear-market protection without going delta-neutral. Classical time-series momentum has decades of live practitioner deployment across asset classes; the portfolio construction enhancements are the modern element. The applied history criterion is strongly satisfied.
@@ -563,7 +591,37 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 **V02 Hypothesis (pending test):** Expand to 61 pairs (top-15 + 46 established mid-caps). If mid-cap pairs exhibit stronger momentum (shorter price discovery, retail-driven trends), long-side PF should improve materially. `AdaptiveTrendStrategy_V02.py` + `config_adaptivetrend_v2.json` built 2026-04-08. Data download pending. Fee set to 0.001 (10bps round-trip) for mid-cap spread realism. Survivorship bias caveat noted — V02 results are upper-bound estimates.
 
-**Next session:** download-data → V02 long-only full period + regime splits → enable shorts → GO/NO-GO decision.
+**V02/V03 results (2026-04-09):**
+- V02 (61 pairs, ATR_MULT=3.5, can_short=False): PF 0.63, −74.4%, 2,411 trades, 27.2% WR — mid-cap expansion made results worse, not better. Post-2021 speculative tokens systematically destroyed value on the long side.
+- V03 (57 pairs, EMA(100) trend filter, MOM_LOOKBACK 72, ATR-normalized entry, momentum exit): PF 0.69, −62.2%, 2,639 trades, 28.0% WR — momentum exit increased churn; only 11/57 pairs achieved PF > 1.0. Marginal improvement insufficient to continue.
+- **Archive verdict:** Three iterations, all long-only failures. Per protocol, archived. Short leg (+26.6% in V01) becomes Candidate N.
+
+---
+
+#### CANDIDATE N: ShortBias Momentum — Bear-Regime Short Trend Following on Liquid Large-Caps
+- **Status:** CANDIDATE — surfaced from AdaptiveTrend (M) Phase 0 empirical finding, 2026-04-09. Awaiting first Phase 0 run (V01 regime splits with can_short=True). Dev plan not yet created.
+- **Source:** Derived from M Phase 0: 6 large-cap pairs, can_short=True, ATR_MULT=3.5 — short leg produced 270 trades, +26.6% over 2022–2025. Source paper: Bui & Nguyen (arXiv 2602.11708) §3.3 asymmetric allocation; short universe uses low-market-cap pairs in the paper.
+- **Core idea:** SHORT-ONLY (or short-dominant with negligible longs) momentum strategy on 6–12 liquid large-cap crypto pairs. Entry: ROC signal < −θ_entry. Exit: ATR trailing stop (3.5×). Bear-regime gate: only enter shorts when price is below a long-period MA (e.g., EMA(200) on daily, or 200-bar EMA on 6h) to avoid shorting into sustained bull markets. This is a standalone strategy — not a continuation of AdaptiveTrend's bidirectional thesis.
+- **Why it's interesting:**
+  - V01 short leg: 270 trades, +26.6% over 2022–2025 across just 6 pairs — strong signal quality on a very small universe
+  - Crypto secular bear markets are predictable and persistent; short momentum in a confirmed downtrend is the strongest version of this signal
+  - Bear-regime macro filter would dramatically reduce risk of shorting into bull rallies — the primary failure mode
+  - **Zero additional data download required** — 6h futures data already on disk; V01 strategy already built
+  - Infrastructure is complete: `AdaptiveTrendStrategy_V01.py` with can_short=True is the starting point
+- **Critical open questions (Phase 0 must answer):**
+  1. **Regime breakdown:** How does the short leg perform in 2022 (bear, −70%), 2023 (bull, +179%), 2024 (bull, +64.5%)? If the entire +26.6% comes from 2022 and the strategy loses badly in 2023/2024, the edge is bear-market-only and the strategy requires a regime filter to be viable.
+  2. **Bear-regime filter efficacy:** Does a macro filter (price below EMA(200)) preserve bear-year profits while blocking bull-year losses without reducing trade count below the frequency floor?
+  3. **Trade count at short-only:** 270 shorts over 3 years on 6 pairs = ~90/year. Meets the ≥80-trade floor but is low. May need to expand to 12–15 pairs to satisfy frequency objective.
+- **Key risks:**
+  - Short-only has theoretically unlimited loss; requires strict margin controls
+  - +26.6% may be heavily concentrated in 2022 — narrow regime applicability
+  - Frequency concern at 6-pair universe (may need expansion)
+- **Stack translation:** VERY HIGH — identical to M V01 infrastructure; changes are: remove long entry logic, add bear-regime MA filter, adjust SHORT_PAIRS list
+- **Evaluation filter score:** Not yet formally scored. Preliminary: likely 5–6/7 (conditional on regime breakdown and frequency validation).
+- **First steps:**
+  1. Run V01 regime splits (can_short=True, short-only analysis): `--timerange 20220101-20230101`, `20230101-20240101`, `20240101-20250101`
+  2. If short PF > 1.0 in ≥ 2/3 years → create Dev Plan, build V01-N (short-only + bear filter)
+  3. If short PF > 1.0 only in 2022 → add bear-regime filter, re-run, reassess
 
 ---
 
@@ -621,13 +679,13 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 - **Co-investigator note (2026-04-07):** The full paper materially weakens the case for L. The headline Sharpe 2.12 is the best of 37 pairs; portfolio-level expected Sharpe at daily frequency is closer to 0.89 (walk-forward mean). The frequency gap (daily → intraday) is not bridged by Palazzi — it requires a separate body of work. With M offering a cleaner implementation path and L carrying unresolved architecture and selection-bias problems, **L should remain #2 but not be started until M's Phase 0 is complete.** If M passes Phase 0, reassess whether L's dual-leg complexity is worth pursuing. If M fails, L becomes the primary candidate — but the frequency validation step must be done first (backtest at 1h/4h before committing to implementation).
 
-### 4.4 Current Priority Ranking (as of 2026-04-08)
+### 4.4 Current Priority Ranking (as of 2026-04-09)
 
-1. **Candidate M (AdaptiveTrend)** — **ACTIVE Phase 0.** V01 (15 large-caps) fully tested: long-only FAIL (PF 0.81), long+short PF 1.07 at ATR_MULT=3.5 but short leg carried everything. V02 (61 pairs, mid-cap expansion) built; data download + backtests pending next session. Decision gate: if V02 long-only achieves PF > 1.0 in ≥ 2/3 regime years → continue to 3×3 L×θ grid; otherwise archive. See Phase 0 results block above and `AdaptiveTrend_Deep_Dive.md`.
+1. **Candidate N (ShortBias Momentum)** — **IMMEDIATE Phase 0.** Surfaced from M's profitable short leg (+26.6% over 2022–2025 on 6 large-cap pairs). Zero data download needed; V01 infrastructure reusable. First step: run V01 regime splits with can_short=True to get 2022/2023/2024 short-leg breakdown. If PF > 1.0 in ≥ 2/3 years → build V01-N (short-only + bear-regime filter). Low effort; high probability of fast signal validation. See Candidate N entry above.
 
-2. **Candidate L (Enhanced CointPairs)** — Remains #2, but **priority revised downward after full-paper analysis (2026-04-07).** Palazzi paper is daily-only; headline Sharpe 2.12 is best-of-37 pairs (only 35% OOS success across pairs); walk-forward mean Sharpe 0.89, Std Dev 2.54. Frequency gap (daily → intraday) unresolved. Dual-leg Freqtrade architecture unresolved. Formal score: 5/7 + 1 conditional. **Do not start until M Phase 0 is complete.** If pursuing: frequency backtest (1h/4h) required before any implementation. Dev plan: `EnhancedCointPairs_Dev_Plan.md`.
+2. **Candidate L (Enhanced CointPairs)** — Remains #2. **Do not start until N Phase 0 is complete.** Palazzi paper is daily-only; headline Sharpe 2.12 is best-of-37 pairs (only 35% OOS success); walk-forward mean Sharpe 0.89, Std Dev 2.54. Frequency gap (daily → intraday) unresolved. Dual-leg architecture unresolved. Formal score: 5/7 + 1 conditional. If pursuing: frequency backtest (1h/4h) required before implementation. Dev plan: `EnhancedCointPairs_Dev_Plan.md`.
 
-3. **Candidate K (Multi-Timeframe Trend)** — Filter/enhancement for M, L, LiqCascade, or future trend work — not standalone.
+3. **Candidate K (Multi-Timeframe Trend)** — Filter/enhancement for N, L, LiqCascade, or future trend work — not standalone.
 
 4. **Candidate G (Cross-Sectional Momentum)** — **PARKED.** Reopen only per G's parking policy.
 
@@ -637,9 +695,11 @@ Status key: `ARCHIVED` = tried and abandoned · `ACTIVE` = currently deployed or
 
 7. **Candidates B (Funding Rate Arb), C (Vol Commonality), D (CNN Preprocessing)** — Parked. Unchanged.
 
+8. **Candidate M (AdaptiveTrend)** — **ARCHIVED (2026-04-09).** Phase 0 NO-GO — long-only signal failed V01 (PF 0.81), V02 (PF 0.63), V03 (PF 0.69). See §4.1 post-mortem.
+
 *This ranking reflects the state of knowledge as of the date above. Update after any new sweep, evaluation, or project outcome.*
 
-**Queue history:** E archived (2026-03-23, backtest fail). G parked (2026-03-29, empirically weak). J promoted to #1 (2026-03-31, Sweep #4). J parked (2026-04-06, Phase 0 NO-GO). L elevated to #1. **M promoted to #1 (2026-04-07, Sweep #5) — L drops to #2.**
+**Queue history:** E archived (2026-03-23, backtest fail). G parked (2026-03-29, empirically weak). J promoted to #1 (2026-03-31, Sweep #4). J parked (2026-04-06, Phase 0 NO-GO). L elevated to #1. M promoted to #1 (2026-04-07, Sweep #5) — L drops to #2. **M archived (2026-04-09, Phase 0 NO-GO after V01/V02/V03). N promoted to #1 (short-bias derivative from M's short leg).**
 
 ---
 
@@ -938,12 +998,17 @@ Hard-won insights that apply across all approaches. Add to this as projects conc
 
 12. **Lead–lag features ≠ directional edge on followers.** A mathematically meaningful cross-path score (signature / Lévy-type antisymmetry) can be **nonstationary** and still **lose money** when traded as **naked long/short** on a high-beta alt with a **wide fixed stop** — the tail risk from adverse moves dominates the distribution even when many exits are small winners. Literature often uses **market-neutral** or **portfolio** constructions; copying only the feature while ignoring the risk model duplicates the wrong object. *(Source: Candidate E / PathSignatureLeadLag_V01 backtest archive, 2026-03-23)*
 
+13. **Expanding the universe to more pairs does not improve long-side momentum when the additional pairs are in secular downtrends.** Mid-cap altcoins from the 2021 cycle spent 2022–2024 in persistent structural downtrends — they are not "stronger momentum assets"; they are assets with larger drawdowns and no recovery trend. Universe expansion for a momentum strategy helps only when new pairs have genuine trending structure in the test period. In post-cycle crypto bear markets, more altcoins = more falling knives. Verify per-pair PF distribution before scaling up a universe. *(Source: Candidate M / AdaptiveTrend V02 backtest, 2026-04-09)*
+
+14. **Isolate and test each directional leg of a bidirectional strategy before expanding or improving.** If a long+short composite shows marginal positive PF but the long leg is destroying capital and only the short leg profits, the "strategy" is effectively a short-bias strategy with a capital-destroying attachment. Do not attempt to improve the long leg without first establishing whether the short leg alone is a viable standalone. The correct diagnostic is: run can_short=True full-period, extract leg P&L from the results, and make the architecture decision based on the leg split before any parameter optimization. *(Source: Candidate M / AdaptiveTrend V01 long/short split analysis, 2026-04-08)*
+
 ---
 
 ## 10. Version History
 
 | Date | Change |
 |---|---|
+| 2026-04-09 | v4.3 — **Candidate M ARCHIVED (Phase 0 NO-GO).** V02 (61 pairs): PF 0.63, −74.4% — mid-cap expansion worse than large-cap baseline. V03 (57 pairs + EMA(100) filter + 72-bar lookback + ATR-norm entry + momentum exit): PF 0.69, −62.2% — momentum exit churned trades; 11/57 pairs above PF 1.0. Long-only signal structurally unprofitable across all iterations. M moved to §4.1 archive with full post-mortem. **Candidate N (ShortBias Momentum) added to §4.3** — derived from M's profitable short leg (+26.6% in V01). §4.4 updated: N is #1 (immediate regime splits), L remains #2. Related files updated. Lessons #13 and #14 added. `AdaptiveTrend_Dev_Plan.md` and `AdaptiveTrend_Deep_Dive.md` updated to ARCHIVED. |
 | 2026-04-08 | v4.2 — **Candidate M Phase 0 V01 complete; V02 mid-cap expansion built.** M status updated to ACTIVE. Phase 0 results block added: 6 backtest runs (V01, 15 large-caps), ATR_MULT sensitivity (2.5→3.5), long/short split diagnosis. Key finding: long signal weak on large-caps; short leg carries profit; V02 mid-cap expansion (61 pairs) is the diagnostic test. `AdaptiveTrend_Deep_Dive.md` created. §4.4 M entry updated with Phase 0 status and next-session gate. Related files list updated. |
 | 2026-04-07 | v4.1 — **Candidate L full-paper analysis (Palazzi 2025).** Entry significantly revised: formal 5/7+conditional score (downgraded from 6/7 estimate); performance table and walk-forward stats added; 35% OOS success rate across pairs flagged; frequency mismatch (daily-only) and daily/intraday separation from IEEE paper corrected; lookback sensitivity characterised; §4.4 L entry updated with revised rationale. |
 | 2026-04-07 | v4.0 — **Sweep #5 complete.** Candidate M (AdaptiveTrend, arXiv 2602.11708) surfaced and evaluated 6/7 PASS — promoted to **#1 build priority**. L drops to #2. Funding Rate Extreme added to §7.4 Techniques Library. §4.4 priority ranking updated. Sweep #5 logged. |

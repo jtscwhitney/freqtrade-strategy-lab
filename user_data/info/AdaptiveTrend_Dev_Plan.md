@@ -1,7 +1,7 @@
 # AdaptiveTrend — Development Plan
 ## Candidate M from AlgoTrading Research Log
-## Created: 2026-04-07 | Last updated: 2026-04-08
-## STATUS: ACTIVE — Phase 0 (V02 mid-cap expansion; data download pending)
+## Created: 2026-04-07 | Last updated: 2026-04-09
+## STATUS: ARCHIVED — Phase 0 NO-GO (2026-04-09)
 
 ---
 
@@ -24,10 +24,10 @@ Systematic multi-pair momentum strategy (rate-of-change signal) on **6h candlest
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **0** | **IN PROGRESS** | V01 complete (15 large-caps): long-only FAIL (PF 0.81), short leg carried profit (PF 1.07 long+short). V02 built: 61-pair mid-cap expansion. Data download + V02 backtests pending. |
-| **1** | Pending Phase 0 GO | Add rolling Sharpe-based pair selection (monthly optimization) |
-| **2** | Pending Phase 1 GO | Hyperopt on core parameters |
-| **3** | Pending Phase 2 GO | Dry-run deployment |
+| **0** | **CLOSED — NO-GO** | V01 (PF 0.81), V02 (PF 0.63), V03 (PF 0.69) — all long-only failures. See results below. |
+| **1** | CANCELLED | Not reached — Phase 0 failed. |
+| **2** | CANCELLED | Not reached. |
+| **3** | CANCELLED | Not reached. |
 
 ### Critical Context Before Starting
 
@@ -54,13 +54,44 @@ Systematic multi-pair momentum strategy (rate-of-change signal) on **6h candlest
 
 **V01 diagnosis:** Long signal weak on large-cap pairs regardless of ATR_MULT. Short leg (6 pairs) carried all profit. ATR_MULT=3.5 empirically better than paper default 2.5. Hypothesis: paper edge lives in mid/small-cap pairs.
 
-### V02 — 61 pairs (top-15 + 46 mid-caps), ATR_MULT=3.5
+### V02 — 61 pairs (top-15 + 46 mid-caps), ATR_MULT=3.5, fee=0.001
 
 Files: `AdaptiveTrendStrategy_V02.py`, `config/config_adaptivetrend_v2.json`
 
-**Data download NOT yet run (session ended before this step).**
+| Metric | Value |
+|--------|-------|
+| PF | **0.63** |
+| Total return | −74.4% |
+| Total trades | 2,411 |
+| Win rate | 27.2% |
+| Avg hold | 8.5 days |
 
-Next session: run download, then V02 long-only full-period (fee 0.001 for mid-cap spread realism), then regime splits, then enable shorts.
+**V02 diagnosis:** Mid-cap expansion made things materially worse. Post-2021 speculative tokens (DYDX PF 0.27, ONE PF 0.11, GRT PF 0.30, XTZ PF 0.03) systematically caught falling knives in 2022–2025. Only 11/61 pairs above PF 1.0. Long-side momentum hypothesis on mid-caps falsified.
+
+### V03 — 57 pairs, EMA(100) trend filter, MOM_LOOKBACK=72, ATR-normalized entry, momentum exit
+
+Files: `AdaptiveTrendStrategy_V03.py`, `config/config_adaptivetrend_v3.json`
+
+| Metric | Value |
+|--------|-------|
+| PF | **0.69** |
+| Total return | −62.2% |
+| Total trades | 2,639 |
+| Win rate | 28.0% |
+| Avg hold | 5.4 days |
+
+**V03 diagnosis:** Marginal improvement (0.63 → 0.69). Momentum exit (`mom < 0`) backfired — increased churn (trades up 2,411 → 2,639, hold time down 8.5d → 5.4d). EMA(100) on 6h too short for genuine regime filtering. 11/57 pairs above PF 1.0.
+
+---
+
+## ARCHIVE VERDICT (2026-04-09)
+
+**Phase 0 NO-GO. Candidate M ARCHIVED.**
+
+Three iterations, all long-only failures. Long-side momentum signal has no consistent edge in this universe over the 2022–2025 period. Root causes: (1) secular altcoin downtrend throughout test period; (2) paper's SR 2.41 requires 150+ pairs + monthly Sharpe rotation — incompatible with fixed whitelist MVP; (3) mid-cap expansion worsened results.
+
+**Salvageable:** Short leg (V01, 6 large-caps): +26.6% → **Candidate N (ShortBias Momentum)**.
+**Reusable infrastructure:** `AdaptiveTrendStrategy_V01/V02/V03.py` — ATR trailing stop, slot management, `_row_at()`.
 
 ---
 
@@ -244,10 +275,12 @@ OOS validation on 2024 data after hyperopt — must not show significant degrada
 |------|---------|--------|
 | `user_data/strategies/AdaptiveTrendStrategy_V01.py` | 15-pair large-cap MVP — COMPLETE; can_short=True ATR_MULT=3.5 (last state) | **Built + tested** |
 | `config/config_adaptivetrend.json` | 15-pair whitelist, port 8087 | **Built** |
-| `user_data/strategies/AdaptiveTrendStrategy_V02.py` | 61-pair mid-cap expansion — can_short=False ATR_MULT=3.5 | **Built; awaiting data+backtest** |
+| `user_data/strategies/AdaptiveTrendStrategy_V02.py` | 61-pair mid-cap expansion — can_short=False ATR_MULT=3.5 | **Built + tested (FAIL PF 0.63)** |
 | `config/config_adaptivetrend_v2.json` | 61-pair whitelist, port 8088, max_open_trades=37 | **Built** |
-| `user_data/info/AdaptiveTrend_Dev_Plan.md` | THIS FILE | Created 2026-04-07 |
-| `user_data/info/AdaptiveTrend_Deep_Dive.md` | Technical deep dive | **Created 2026-04-08** |
+| `user_data/strategies/AdaptiveTrendStrategy_V03.py` | 57-pair + EMA filter + 72-bar lookback + ATR-norm entry | **Built + tested (FAIL PF 0.69)** |
+| `config/config_adaptivetrend_v3.json` | 61-pair whitelist (V03 uses same data), port 8089 | **Built** |
+| `user_data/info/AdaptiveTrend_Dev_Plan.md` | THIS FILE (ARCHIVED) | Created 2026-04-07 |
+| `user_data/info/AdaptiveTrend_Deep_Dive.md` | Technical deep dive (ARCHIVED) | Created 2026-04-08 |
 
 ---
 
