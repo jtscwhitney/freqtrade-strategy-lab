@@ -249,6 +249,7 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 - **v5.0 reframing:** Under the revised §2 frequency objective (portfolio ≥ 30 trades/month, individual strategies may be daily), L is a viable candidate IF run as a portfolio of multiple spreads. The dual-leg coordination problem remains. The selection bias problem must be addressed by holding out half the pair universe at evaluation time.
 - **Deferred because:** the GatedExecution synthesis (§4.5) is the primary v5.0 thesis. L should be re-scoped as either (a) an independent portfolio-of-pairs candidate evaluated under §6, or (b) a market-neutral signal layer feeding GatedExecution. Decision to be made at the next research session.
 - **Dev plan:** `EnhancedCointPairs_Dev_Plan.md` (do not execute until L clears §6 under v5.0)
+- **Forward deploy checkpoint (2026-04-18):** Live-shaped forward test in **`freqtrade-coint-pairs-trading`** (six Freqtrade processes on two DigitalOcean droplets: BTC/ETH, BNB/SOL, BTC/SOL × V01/V02). Combined: **8** open legs, **12** closed legs; **total PnL ≈ −US$774** (closed + open MTM), **≈ −1.72%** vs sum of stakes in DBs. **BTC/ETH** replicas **positive** total PnL; **BNB/SOL** replicas **negative**; **BTC/SOL** replicas **deeply negative** on **realized** closed history (no open exposure at snapshot). **Decision: CONTINUE** — well **short** of the §2 **~50 closed trades** minimum for a coarse forward read; **does not** advance §6. Full table: `freqtrade-coint-pairs-trading/TESTING.md`.
 
 #### Candidate N: ShortBias Momentum — *INVESTIGATION ONLY*
 - **Status:** INVESTIGATION (downgraded from prior #1 priority on 2026-04-17). Not a Candidate until regime-split test passes.
@@ -327,7 +328,7 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 
 6. **Sourcing Sweep #6** (defer until step 5 is drafted OR until 6 weeks elapsed since 2026-04-07, whichever is later). When run, follow §5 v5.0 reduced-cadence / increased-rigor protocol.
 
-*This ranking reflects the state of knowledge as of 2026-04-17. Update after every checkpoint outcome.*
+*This ranking reflects the state of knowledge as of 2026-04-18 (Candidate L forward checkpoint recorded). Update after every checkpoint outcome.*
 
 ---
 
@@ -686,6 +687,7 @@ Hard-won insights that apply across all approaches. Add as projects conclude.
 
 | Date | Change |
 |---|---|
+| 2026-04-18 | **Candidate L forward checkpoint** — Six-container deploy (`freqtrade-coint-pairs-trading`): 12 closed / 8 open legs, aggregate total PnL ≈ −1.72% vs stakes; **CONTINUE** (below §2 ~50 closed-trade read; §6 unchanged). Details in deploy repo **`TESTING.md`**. |
 | 2026-04-17 | **v5.0 — Major restructure after Process Audit.** Rebuilt evaluation as multi-stage gate (§6.1 buildability + §6.2 edge deflation + §6.3 paper replication checklist + §6.4 phase 0 + §6.5 filter precision tracking + §6.6 workflow kill criterion). Refined frequency objective to portfolio-level (≥30 trades/month) instead of per-strategy. Demoted Candidate N from #1 priority to INVESTIGATION pending regime-split test. Reframed Candidate L from #2 priority to deferred pending GatedExecution design step. Added §4.5 GatedExecution synthesis initiative. Established 70/30 effort allocation rule (active iteration vs new candidates). Reduced sourcing sweep cadence from ~biweekly to ~6-weekly with target-gap protocol (§5.6). Added 3 lessons (#15, #16, #17). Prior v4.3 archived to `AlgoTrading_Research_Log_v4.3_archive_2026-04-17.md`. Companion audit doc: `Research_Audit_2026-04-17_Findings_and_Path_Forward.md`. |
 | 2026-04-09 | v4.3 — Candidate M ARCHIVED (Phase 0 NO-GO). N added. Lessons #13, #14. (See archive.) |
 | 2026-04-08 | v4.2 — M Phase 0 V01 results. (See archive.) |
