@@ -136,22 +136,21 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 ### 4.1 ACTIVE — primary effort allocation per §4.6
 
 #### Liquidation Cascade Strategy (LiqCascade) — v1.0
-- **Status:** ACTIVE — Phase 3.5 (OI Filter Deployed, V05), since 2026-04-06
+- **Status:** ACTIVE — Phase 3.6 (Counter-Trend Fade V06 + Sidecar Stall Detection), since 2026-05-02
 - **Core idea:** Detect forced liquidation cascades via Binance WebSocket data as primary alpha signal. Regime framework demoted to context filter only (CRISIS gate + EMA200 macro trend).
-- **Architecture:** Sidecar (WebSocket liquidation stream + OI polling) → signal file → Freqtrade 5m strategy reads signal → enter with-trend cascade, exit via 2×ATR target / 1×ATR stop / 30 min time stop. 4x leverage.
-- **Current deployment:** DigitalOcean droplet, Docker, 5 pairs dry-run: BTC, ETH, SOL, BNB, XRP/USDT. max_open_trades=5. Strategy V05.
-- **Phase plan:** Phase 3 (dry-run) ✓ → Phase 3.5 (OI filter) ACTIVE → Phase 4 (hyperopt) → Phase 5 (additional pairs if needed) → Phase 6 (live capital).
-- **Go/no-go for Phase 4:** profit factor > 1.0, win rate > 40%, time-stop rate < 50% — reassess **2026-04-20**.
-- **Phase 3 results (2026-04-05, 19 days, 389 trades):** Win rate 43.4% · PF 0.473 · Time-stop rate 60.7%. Exits: roi avg +0.66% (98.6% win) · trailing_stop_loss avg +3.78% (100% win) · time_stop 0% win. **Root cause: entry thresholds too loose** — generates ~20 entries/day; genuine cascades ~1–2/pair/day.
-- **Phase 3.5 OI retrospective (2026-04-06, 304 trades, March 21–30):** OI change rate discriminates 1.67× overall; 2.3× for shorts. Per-pair: XRP 4.74×, BNB 2.60×, ETH 1.36×, SOL 1.26×, BTC 0.96× (none). V05 filter: `|oi_change_pct_1m| >= 0.06` on short entries for ETH/SOL/BNB/XRP only. Sidecar JSONL logging bug fixed.
-- **Open questions:**
-  1. Counter-trend cascade quality (short squeezes in bear markets)
-  2. OI filter threshold review at 2026-04-20 — tighten if short win rate still <40%
-  3. ATR-relative vs fixed ROI targets
-  4. Funding rate as entry pre-condition (Technique 7.4)
-  5. BTC-specific filter — OI unhelpful; consider tighter CASCADE_MULT in sidecar for BTC only
-- **v5.0 priority:** **#1 effort allocation.** This is the only strategy with confirmed real signal (cascade detection) and a clear improvement path (entry tightening). Iterate aggressively.
-- **Repo:** `freqtrade-scalper` (separate) — `strategies/LiqCascadeStrategy_V05.py`, `sidecar/liquidation_monitor.py`
+- **Architecture:** Sidecar (WebSocket liquidation stream + OI polling) → signal file → Freqtrade 5m strategy reads signal → **V05 rides cascade (with-trend)** · **V06 fades cascade (counter-trend)**. ETH+SOL only for V06. 4x/2x leverage.
+- **Current deployment:** DigitalOcean droplet, Docker. V05 on port 8082 (5 pairs: BTC/ETH/SOL/BNB/XRP), V06 on port 8083 (2 pairs: ETH/SOL only). Separate DBs. Shared sidecar.
+- **Phase plan:** Phase 3 (dry-run) ✓ → Phase 3.5 (OI filter) ✓ → **Phase 3.6 (counter-trend V06)** ACTIVE → Phase 4 (hyperopt, if V06 PF > 1.0) → Phase 6 (live capital, if any variant proves profitable).
+- **Phase 3.5 final results (2026-05-02, 752 trades, Mar 17–Apr 19):**
+  - Overall: PF 0.488 · WR 39.0% · −$4,789 · Time-stop rate 56.4% (unchanged from Phase 3's 60.7%)
+  - Shorts (342): **PF 0.672** · WR 42.7% · −$1,342. Longs (410): PF 0.345 · WR 35.9% · −$3,447
+  - Short exits: time_stop 56.4% (0% WR) · roi 40.6% (97.8% WR) · trailing 2.9% (100% WR)
+  - **OI filter verdict:** Did not improve results. Week 15 (post-deploy) had worst short PF (0.272) and WR (30.5%)
+  - **WebSocket stall:** Binance forceOrder stream silently died Apr 19. Root cause: Binance migrated WebSocket URLs on Apr 23 — `!forceOrder@arr` moved from `/ws` to `/market/ws/`. Sidecar was connecting to legacy URL which no longer serves market data. **Fixed 2026-05-02** (URL updated). Stall detection added (120s watchdog with auto-reconnect).
+  - **All 5 pairs negative, all PFs < 1.0.** Do NOT advance to Phase 4.
+- **Phase 3.6 (V06 Counter-Trend Fade):** V06 inverts V05's direction: CASCADE_LONG → SHORT, CASCADE_SHORT → LONG. Thesis: cascade overshoots are common; the snap-back is more reliable than the initial direction. Shorter time stop (15 min vs 35). Tighter ROI. Flipped leverage (counter-trend gets 4x). **ETH+SOL only** (best V05 short PF: 0.925, 0.863). No OI filter.
+- **Kill criterion:** 50 closed trades with short PF < 1.0 → archive LiqCascade permanently, fold into GatedExecution as gate signal.
+- **Repo:** `freqtrade-scalper` (separate) — `strategies/LiqCascadeStrategy_V05.py`, `V06.py`, `sidecar/liquidation_monitor.py`
 - **Deep dive:** `LiquidationCascade_Deep_Dive.md` (in `freqtrade-scalper`)
 
 #### OracleSurfer Strategy (v14 PROD)
@@ -251,17 +250,37 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 
 *Candidates and investigations below have NOT yet cleared the full v5.0 multi-stage gate (§6) for promotion to ACTIVE. All require §6.1 + §6.2 + §6.3 before new capitalized build effort.*
 
-#### Candidate N: ShortBias Momentum — *INVESTIGATION ONLY*
-- **Status:** INVESTIGATION (downgraded from prior #1 priority on 2026-04-17). Not a Candidate until regime-split test passes.
+#### Candidate N: ShortBias Momentum — ARCHIVED (2026-05-02)
+- **Status:** ARCHIVED — failed step 3 of the §4.4 investigation procedure. Signal confirmed as short-beta capture.
 - **Origin:** AdaptiveTrend (M) Phase 0 — short leg of V01 produced +26.6% over 2022–2025 across 6 large-cap pairs.
-- **v5.0 critical assessment:** A +26.6% return concentrated in a window dominated by a single −70% bear move is consistent with naive short-beta capture. The prior log promoted this to #1 directly from a backtest artifact of a failed strategy. That is a textbook source of false candidates and must not be repeated.
-- **Required investigation steps before promotion to CANDIDATE:**
-  1. Run V01 short-only (`can_short=True`, drop long entries) split by year: `--timerange 20220101-20230101`, `20230101-20240101`, `20240101-20250101`.
-  2. Report: trades, PF, return, WR, MDD per year.
-  3. Compute the **buy-and-hold short** P&L on the same 6 pairs over the same windows as benchmark. The strategy's edge is `strategy_return − short_BnH_return`. If the spread is < +5% absolute or negative in any year, the signal is harvesting beta, not edge. Archive.
-  4. If spread is > +5% in ≥ 2/3 years, then run with EMA(200)-on-daily macro filter (only short when below filter). Report whether the filter preserves spread while reducing MDD.
-  5. Only then is N a Candidate, eligible for §6 evaluation.
-- **Effort budget:** the four steps above are < 1 day of work. Do them at the next session, before any sourcing sweep.
+- **Investigation results (AdaptiveTrendStrategy_V01_ShortOnly, ATR_MULT=3.5, 6h, 0.05% fee, 6 pairs):**
+
+  | Year | Trades | PF | Return | Sharpe | WR | MDD | Market Δ | Short BnH | Spread |
+  |------|--------|-----|--------|--------|-----|------|-----------|-----------|--------|
+  | 2022 | 125 | 1.65 | +77.55% | 1.28 | 48.8% | 25.88% | −74.52% | +74.52% | **+3.03pp** |
+  | 2023 | 111 | 0.57 | −28.78% | −1.28 | 36.9% | 30.44% | +255.96% | −100% | +71.22pp |
+  | 2024 | 112 | 0.94 | −3.70% | −0.13 | 40.2% | 20.09% | +91.73% | −91.73% | +88.03pp |
+
+- **Why it failed:** 2022 spread = +3.03pp — below the +5pp threshold. The headline +77.55% return in the one year shorting worked was 96% beta capture. The momentum filter (ROC < −3%) provides real edge in bull years by preventing suicidal shorts, but that is a basic trend filter, not a novel signal. In bear markets — the regime where short alpha must prove itself — the strategy barely beat passive short.
+- **Lesson reinforced:** §9 #16 — backtest sub-leg artifacts are not new candidates. The v5.0 audit's prediction was exactly correct.
+- **Reusable:** `AdaptiveTrendStrategy_V01_ShortOnly.py` (strategy), `config_adaptivetrend_shortonly.json` (config). Both retained for reproducibility.
+
+#### Candidate O: EMA50 × YTD Anchored VWAP Crossover — REJECTED (2026-05-02)
+- **Status:** REJECTED — failed §6.1 Buildability Filter (4/7) + Phase 0 empirical NO-GO.
+- **Source:** YouTube video (not academic). Prompts Claude to generate Pine Script for EMA(50) × YTD Anchored VWAP crossover with swing-level stops.
+- **§6.1 score:** 4/7 — FAIL (no OOS evidence, no structural mechanism, no complementarity).
+- **Phase 0 quick-test (V01, 4h, 0.05% fee, 5 pairs: BTC/ETH/BNB/SOL/XRP):**
+
+  | Period | Trades | PF | Return | Sharpe | WR |
+  |--------|--------|-----|--------|--------|-----|
+  | 2022 | 20 | 0.50 | −1.16% | −0.24 | 55.0% |
+  | 2023 | 38 | 0.71 | −0.84% | −0.15 | 42.1% |
+  | 2024 | 42 | 0.57 | −2.27% | −0.38 | 45.2% |
+  | Full | 140 | 0.75 | −3.10% | −0.14 | 47.1% |
+
+- **Why it failed:** Negative every year, no favorable regime. Short side −7.18% vs long +4.08% — YTD VWAP drifts upward in crypto's secular uptrend, making downside crossovers false signals. 140 trades / 4 years across 5 pairs = ~0.1/day — frequency rounding error. Market did +27.77%, strategy lost −3.1%.
+- **Lesson:** "Institutional breakeven" anchored VWAP narrative is retail folklore, not alpha. The signal is functionally a slow MA crossover — a well-studied class with poor standalone profitability at retail fees.
+- **Reusable:** `EMAVWAPStrategy_V01.py`, `config_emavwap.json`. Retained as reference/anti-pattern.
 
 #### Candidates B, C, D, H, I, K — preserved status
 - **B (Funding Rate Arbitrage):** PARKED — non-Freqtrade infrastructure; lower ROI than active candidates. Status unchanged; reconsider as a carry sleeve under GatedExecution if a 2-leg sidecar is built.
@@ -317,19 +336,17 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 
 **Sequenced priorities (do in order, do not parallelize):**
 
-1. **Candidate N investigation** (≤ 1 day, do first). Run the 4-step short-only regime-split + benchmark spread analysis described in §4.4 N. Outcome: PROMOTE to Candidate (then §6 evaluation), or ARCHIVE permanently. Done before any new sweep.
+1. **LiqCascade Phase 3.6** (passive, 2–3 week soak). V06 counter-trend deployed 2026-05-02 alongside V05 on droplet. Reassess at 50 closed trades or ~2026-05-16. Kill criterion: short PF < 1.0 → archive permanently.
 
-2. **LiqCascade Phase 3.5 reassessment** (2026-04-20 checkpoint, do regardless of N). If short WR ≥ 40% and PF > 1.0, advance to Phase 4 (hyperopt). If not, tighten OI threshold or revisit per-pair filters before advancing.
+2. **OracleSurfer v14 monitoring** (passive, ongoing). At 8 closed v14 trades, mid-window check: if WR < 30%, pause and diagnose. Otherwise continue to 15-trade gate.
 
-3. **OracleSurfer v14 monitoring** (passive, ongoing). At 8 closed v14 trades, mid-window check: if WR < 30%, pause and diagnose. Otherwise continue to 15-trade gate.
+3. **Deflation pass on Candidate L (PARKED)** (1 session). Forward droplet experiment concluded **2026-05-02**. Complete §6.2 on Palazzi 2025 and decide formally: integrate spread/z layer into **§4.5**, revive as narrowed portfolio-of-spreads charter, or **ARCHIVE**.
 
-4. **Deflation pass on Candidate L (PARKED)** (1 session). Forward droplet experiment concluded **2026-05-02** (~4 weeks aggregate **~+0.01%** vs stakes; BTC/ETH replicas **~+4.2%**, BNB/SOL and BTC/SOL replicas **negative**; **§2** statistical bar **not met** — see §4.3). Complete §6.2 on Palazzi 2025 and decide formally: integrate spread/z layer into **§4.5**, revive as narrowed portfolio-of-spreads charter, or **ARCHIVE**.
+4. **GatedExecution Dev Plan v0.1** (1 session, only after step 1 outcome is known). Draft the synthesis architecture per §4.5 with the actual primary signal (LiqCascade if GO, alternative if NO-GO).
 
-5. **GatedExecution Dev Plan v0.1** (1 session, only after step 2 outcome is known). Draft the synthesis architecture per §4.5 with the actual primary signal (LiqCascade if GO, alternative if NO-GO).
+5. **Sourcing Sweep #6** (defer until step 4 is drafted OR until 6 weeks elapsed since 2026-04-07, whichever is later). When run, follow §5 v5.0 reduced-cadence / increased-rigor protocol.
 
-6. **Sourcing Sweep #6** (defer until step 5 is drafted OR until 6 weeks elapsed since 2026-04-07, whichever is later). When run, follow §5 v5.0 reduced-cadence / increased-rigor protocol.
-
-*This ranking reflects the state of knowledge as of **2026-05-02** (Candidate L forward discontinued; PARKED — §4.3). Update after every checkpoint outcome.*
+*This ranking reflects the state of knowledge as of **2026-05-02** (Candidate N archived — investigation failed; Candidate O rejected at §6.1 + Phase 0 NO-GO). Update after every checkpoint outcome.*
 
 ---
 
@@ -688,6 +705,8 @@ Hard-won insights that apply across all approaches. Add as projects conclude.
 
 | Date | Change |
 |---|---|
+| 2026-05-02 | **LiqCascade Phase 3.5 complete; Phase 3.6 (V06 counter-trend) deployed.** Reassessment (752 trades): PF 0.488, short PF 0.672, time-stop rate unchanged at 56.4%. OI filter did not improve results. Binance WebSocket URL migrated Apr 23 — sidecar fixed (stall detection added, URL updated to `/market/ws/!forceOrder@arr`). V06 deployed: counter-trend fade, ETH+SOL only, 15-min time stop, flipped leverage. Kill criterion: 50 trades PF < 1.0. |
+| 2026-05-02 | **Candidate N — ARCHIVED (investigation failed step 3).** Short-only regime splits (2022/2023/2024): 6 pairs, ATR_MULT=3.5, 6h. 2022 spread strategy vs short-BnH = +3.03pp — below +5pp threshold; signal confirmed as 96% short-beta capture. Lesson #16 validated. **Candidate O (EMA50 × YTD Anchored VWAP) — REJECTED** at §6.1 (4/7) + Phase 0 NO-GO (PF 0.75, −3.1%, negative every calendar year). Short side −7.18% vs market +27.77%. Reference code retained. Priority ranking updated — LiqCascade reassessment now #1. |
 | 2026-05-02 | **Candidate L — forward deploy discontinued; PARKED.** Six-container **`freqtrade-coint-pairs-trading`** run ended by policy after ~**4 weeks**; final combined snapshot (**2026-05-02**): **12** open legs, **17** closed trade rows across DBs, aggregate **≈ +0.01%** vs sum of stakes (closed + open MTM). Per-spread: **BTC/ETH** replicas **~+4.25%** each (**V01/V02**), **BNB/SOL** and **BTC/SOL** replicas **negative**. **Recommendation: keep (not ARCHIVED)** — retain strategies + Phase 0 pipeline for **§4.5** optional spread gate or narrowed §6 revival; reopen only per §4.3 triggers. §4.6 step 4 updated. GatedExecution table gains pairs-spread row. Mirrors updated in **`user_data/info/EnhancedCointPairs_*.md`** (both repos). |
 | 2026-04-18 | **Candidate L forward checkpoint** — Six-container deploy (`freqtrade-coint-pairs-trading`): 12 closed / 8 open legs, aggregate total PnL ≈ −1.72% vs stakes; **CONTINUE** (below §2 ~50 closed-trade read; §6 unchanged). Details in deploy repo **`TESTING.md`**. |
 | 2026-04-17 | **v5.0 — Major restructure after Process Audit.** Rebuilt evaluation as multi-stage gate (§6.1 buildability + §6.2 edge deflation + §6.3 paper replication checklist + §6.4 phase 0 + §6.5 filter precision tracking + §6.6 workflow kill criterion). Refined frequency objective to portfolio-level (≥30 trades/month) instead of per-strategy. Demoted Candidate N from #1 priority to INVESTIGATION pending regime-split test. Reframed Candidate L from #2 priority to deferred pending GatedExecution design step. Added §4.5 GatedExecution synthesis initiative. Established 70/30 effort allocation rule (active iteration vs new candidates). Reduced sourcing sweep cadence from ~biweekly to ~6-weekly with target-gap protocol (§5.6). Added 3 lessons (#15, #16, #17). Prior v4.3 archived to `AlgoTrading_Research_Log_v4.3_archive_2026-04-17.md`. Companion audit doc: `Research_Audit_2026-04-17_Findings_and_Path_Forward.md`. |
