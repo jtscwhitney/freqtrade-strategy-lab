@@ -59,7 +59,7 @@
 - `user_data/info/CrossSectionalMomentum_Phase0_Summary.md` / `Phase1_Summary.md` — G results
 - `user_data/info/LOB_Microstructure_Dev_Plan.md` / `Deep_Dive.md` — Candidate A (ARCHIVED)
 - `user_data/info/EnsembleDonchianTrend_Dev_Plan.md` / `Deep_Dive.md` — Candidate J (PARKED)
-- `user_data/info/EnhancedCointPairs_Dev_Plan.md` / `Deep_Dive.md` — Candidate L (CANDIDATE; deferred per v5.0 priority)
+- `user_data/info/EnhancedCointPairs_Dev_Plan.md` / `Deep_Dive.md` — Candidate L (PARKED; forward experiment concluded 2026-05-02)
 - `user_data/info/AdaptiveTrend_Dev_Plan.md` / `Deep_Dive.md` — Candidate M (ARCHIVED)
 - `deploy/digitalocean.md` — DigitalOcean deployment reference
 - OracleSurfer — in `Freqtrade` repo (separate): `user_data/strategies/OracleSurfer_v14_PROD.py` (ACTIVE dry-run)
@@ -237,19 +237,19 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 - **v5.0 NOTE:** the failure pattern (fee-inclusive multi-pair trend-following at hourly TF gets crushed by transaction costs) is data — incorporated into §6.2 deflation pass.
 - **Files retained:** `EnsembleDonchianStrategy_V01/V02`, `config_donchian.json`, `user_data/scripts/donchian_phase0_sweep.py`, sweep artifacts.
 
+#### Candidate L: Enhanced Cointegration Pairs Trading (with adaptive trailing stop + vol filter)
+- **Status:** PARKED (2026-05-02) — **forward deploy discontinued** after ~4 calendar weeks live-shaped run; **does not merit ARCHIVED** until a formal post-mortem is desired, because lab walk-forward economics and reusable dual-leg infra remain intact.
+- **Source:** Palazzi (Journal of Futures Markets, Aug 2025) — adaptive trailing stop + vol filter on cointegrated crypto pairs (peer-reviewed). Also Tadi & Witzany (Financial Innovation, 2025) — copula-based pairs on Binance Futures.
+- **Headline (paper — not our realized forward):** Best-of-universe survivor metrics in Palazzi; see §6.2 deflation checklist before any revival.
+- **Lab vs forward split:** **`freqtrade-strategy-lab`** walk-forward on **BTC/ETH @ 4h** retained positive headline economics for **V01/V02 defaults** (see `user_data/results/cointpairs_comparison_tables.md`). **`freqtrade-coint-pairs-trading`** six-process forward test (**BTC/ETH, BNB/SOL, BTC/SOL** × **V01/V02**) did **not** validate standalone capital deployment: aggregate PnL was **noise-level** (~**+0.01%** vs sum of stakes, closed + open MTM snapshot **2026-05-02** via `droplet_status_from_local.ps1`) after recovering from an earlier −1.7% checkpoint; **BNB/SOL** and **BTC/SOL** replicas **hurt** totals while **BTC/ETH** replicas **positive** (~**+4.2%** each profile). Closed trade-row count (**17** across DBs at final snapshot) remained **far below §2’s ~50** minimum for a binary forward read — **does not advance §6** toward ACTIVE.
+- **Co-investigator recommendation:** **KEEP for next phases; do not archive.** Treat as **PARKED** signal/infrastructure layer: rerun only after **§6.2 Edge Deflation Pass** on Palazzi claims and explicit decision to (a) fold **spread / z-score** into **§4.5 GatedExecution** as an optional gate, **or** (b) revive as a standalone **portfolio-of-spreads §6** candidate with held-out pairs — **not** as open-ended droplet spend.
+- **Reopen triggers (preserved):** §6.2 deflation worksheet completed AND one of — (i) redesigned forward charter (subset of spreads / sizing / execution) cleared by checklist; **or** (ii) GatedExecution v0 architecture names L-derived signal explicitly; **or** (iii) new fee or venue assumption materially changes economics. Do **not** reopen for unfocused hyperopt or “one more droplet month” alone.
+- **Deploy / ops:** Droplet forward tests **stopped by policy 2026-05-02**; repo **`freqtrade-coint-pairs-trading`** retained for reproducibility and historical logs. Mirrors: `EnhancedCointPairs_Dev_Plan.md`, `EnhancedCointPairs_Deep_Dive.md` (both repos **`user_data/info/`**).
+- **Historical checkpoints:** 2026-04-18 combined snapshot ≈ −1.72%, 12 closed / 8 open legs — `freqtrade-coint-pairs-trading/TESTING.md`. Final 2026-05-02 combined snapshot **12** open legs, **17** closed trade rows — see Deep Dive changelog.
+
 ### 4.4 CANDIDATES & INVESTIGATIONS
 
-*Candidates here have NOT yet been re-evaluated under the v5.0 multi-stage gate (§6). All require: 7-point Buildability Filter (§6.1) AND Edge Deflation Pass (§6.2) AND Paper Replication Checklist (§6.3) before any Dev Plan work.*
-
-#### Candidate L: Enhanced Cointegration Pairs Trading (with adaptive trailing stop + vol filter)
-- **Status:** CANDIDATE — surfaced Sweep #4; full-paper analysis 2026-04-07; **v5.0 priority: deferred to GatedExecution synthesis design step**
-- **Source:** Palazzi (Journal of Futures Markets, Aug 2025) — adaptive trailing stop + vol filter on cointegrated crypto pairs (peer-reviewed). Also Tadi & Witzany (Financial Innovation, 2025) — copula-based pairs on Binance Futures.
-- **Headline:** Optimized OOS LTC/DOGE: 71% annual return, Sharpe 2.12, MDD 14% (best of 37 pairs — 35% OOS positive across pair universe). Walk-forward Sharpe mean 0.89, std 2.54.
-- **v5.0 critical caveats (carried from prior analysis):** Daily data only (frequency mismatch resolved by revised §2). Best-of-37 selection bias. Walk-forward std 2.54 = operational unreliability. ~50% Sharpe decay post-publication (Falck & Rej 2022). Dual-leg coordination unresolved on Freqtrade.
-- **v5.0 reframing:** Under the revised §2 frequency objective (portfolio ≥ 30 trades/month, individual strategies may be daily), L is a viable candidate IF run as a portfolio of multiple spreads. The dual-leg coordination problem remains. The selection bias problem must be addressed by holding out half the pair universe at evaluation time.
-- **Deferred because:** the GatedExecution synthesis (§4.5) is the primary v5.0 thesis. L should be re-scoped as either (a) an independent portfolio-of-pairs candidate evaluated under §6, or (b) a market-neutral signal layer feeding GatedExecution. Decision to be made at the next research session.
-- **Dev plan:** `EnhancedCointPairs_Dev_Plan.md` (do not execute until L clears §6 under v5.0)
-- **Forward deploy checkpoint (2026-04-18):** Live-shaped forward test in **`freqtrade-coint-pairs-trading`** (six Freqtrade processes on two DigitalOcean droplets: BTC/ETH, BNB/SOL, BTC/SOL × V01/V02). Combined: **8** open legs, **12** closed legs; **total PnL ≈ −US$774** (closed + open MTM), **≈ −1.72%** vs sum of stakes in DBs. **BTC/ETH** replicas **positive** total PnL; **BNB/SOL** replicas **negative**; **BTC/SOL** replicas **deeply negative** on **realized** closed history (no open exposure at snapshot). **Decision: CONTINUE** — well **short** of the §2 **~50 closed trades** minimum for a coarse forward read; **does not** advance §6. Full table: `freqtrade-coint-pairs-trading/TESTING.md`.
+*Candidates and investigations below have NOT yet cleared the full v5.0 multi-stage gate (§6) for promotion to ACTIVE. All require §6.1 + §6.2 + §6.3 before new capitalized build effort.*
 
 #### Candidate N: ShortBias Momentum — *INVESTIGATION ONLY*
 - **Status:** INVESTIGATION (downgraded from prior #1 priority on 2026-04-17). Not a Candidate until regime-split test passes.
@@ -289,6 +289,7 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 | **OI confirmation** | OI change rate > threshold (per-pair calibrated) | VALIDATED on shorts (XRP/BNB/ETH/SOL) | LiqCascade Phase 3.5 |
 | **OFI confirmation (optional)** | LOB order flow imbalance agrees with entry direction | RESEARCH (real signal, fee-incompatible standalone) | Candidate A salvage |
 | **Conformal prediction wrapper** | Tighten entries when prediction interval is narrow and one-sided | RESEARCH | Technique 7.1 |
+| **Pairs spread / z-score (mean reversion)** | Dual-leg hedge-ratio spread signal (optional gate, not standalone capital) | PARKED codebase; forward discontinued 2026-05-02 (no ACTIVE GO) | Candidate L §4.3 |
 
 **Architecture sketch:**
 - Each signal source produces a normalized output: {direction, confidence, freshness}.
@@ -322,13 +323,13 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 
 3. **OracleSurfer v14 monitoring** (passive, ongoing). At 8 closed v14 trades, mid-window check: if WR < 30%, pause and diagnose. Otherwise continue to 15-trade gate.
 
-4. **Deflation pass on Candidate L** (1 session). Apply §6.2 to Palazzi 2025 with 50% Sharpe decay, our 10 bps fee tier, regime weighting, and selection-bias adjustment. Decide: re-promote as portfolio-of-pairs Candidate, or fold into GatedExecution as a market-neutral signal layer, or shelve.
+4. **Deflation pass on Candidate L (PARKED)** (1 session). Forward droplet experiment concluded **2026-05-02** (~4 weeks aggregate **~+0.01%** vs stakes; BTC/ETH replicas **~+4.2%**, BNB/SOL and BTC/SOL replicas **negative**; **§2** statistical bar **not met** — see §4.3). Complete §6.2 on Palazzi 2025 and decide formally: integrate spread/z layer into **§4.5**, revive as narrowed portfolio-of-spreads charter, or **ARCHIVE**.
 
 5. **GatedExecution Dev Plan v0.1** (1 session, only after step 2 outcome is known). Draft the synthesis architecture per §4.5 with the actual primary signal (LiqCascade if GO, alternative if NO-GO).
 
 6. **Sourcing Sweep #6** (defer until step 5 is drafted OR until 6 weeks elapsed since 2026-04-07, whichever is later). When run, follow §5 v5.0 reduced-cadence / increased-rigor protocol.
 
-*This ranking reflects the state of knowledge as of 2026-04-18 (Candidate L forward checkpoint recorded). Update after every checkpoint outcome.*
+*This ranking reflects the state of knowledge as of **2026-05-02** (Candidate L forward discontinued; PARKED — §4.3). Update after every checkpoint outcome.*
 
 ---
 
@@ -508,9 +509,9 @@ Each sweep MUST:
 | G (XSMomentum) | v4.0 | 7/7 STRONG | Phase 1 FAIL | PARKED | NO |
 | J (Donchian) | v4.0 | 7/7 STRONG | Phase 0 NO-GO | PARKED | NO |
 | M (AdaptiveTrend) | v4.0 | 6/7 + 1 cond | Phase 0 NO-GO | ARCHIVED | NO |
-| L (Enhanced CP) | v4.0 | 5/7 + 1 cond | not yet attempted | CANDIDATE | TBD |
+| L (Enhanced CP) | v4.0 | 5/7 + 1 cond | lab WF positive; Phase 3 forward discontinued | PARKED | NO |
 | **Filter v4.x precision so far** | | | | | **0 / 5** |
-| | | | | | (with L pending) |
+| | | | | | (L PARKED forward NO-GO — still no live WIN) |
 
 *Update this table after every Phase 0 outcome. If v5.0 gates produce ≥ 2/3 wins in their first 3 fully-evaluated candidates, the gates are effective. If 0/3 pass to live, escalate to §6.6.*
 
@@ -687,6 +688,7 @@ Hard-won insights that apply across all approaches. Add as projects conclude.
 
 | Date | Change |
 |---|---|
+| 2026-05-02 | **Candidate L — forward deploy discontinued; PARKED.** Six-container **`freqtrade-coint-pairs-trading`** run ended by policy after ~**4 weeks**; final combined snapshot (**2026-05-02**): **12** open legs, **17** closed trade rows across DBs, aggregate **≈ +0.01%** vs sum of stakes (closed + open MTM). Per-spread: **BTC/ETH** replicas **~+4.25%** each (**V01/V02**), **BNB/SOL** and **BTC/SOL** replicas **negative**. **Recommendation: keep (not ARCHIVED)** — retain strategies + Phase 0 pipeline for **§4.5** optional spread gate or narrowed §6 revival; reopen only per §4.3 triggers. §4.6 step 4 updated. GatedExecution table gains pairs-spread row. Mirrors updated in **`user_data/info/EnhancedCointPairs_*.md`** (both repos). |
 | 2026-04-18 | **Candidate L forward checkpoint** — Six-container deploy (`freqtrade-coint-pairs-trading`): 12 closed / 8 open legs, aggregate total PnL ≈ −1.72% vs stakes; **CONTINUE** (below §2 ~50 closed-trade read; §6 unchanged). Details in deploy repo **`TESTING.md`**. |
 | 2026-04-17 | **v5.0 — Major restructure after Process Audit.** Rebuilt evaluation as multi-stage gate (§6.1 buildability + §6.2 edge deflation + §6.3 paper replication checklist + §6.4 phase 0 + §6.5 filter precision tracking + §6.6 workflow kill criterion). Refined frequency objective to portfolio-level (≥30 trades/month) instead of per-strategy. Demoted Candidate N from #1 priority to INVESTIGATION pending regime-split test. Reframed Candidate L from #2 priority to deferred pending GatedExecution design step. Added §4.5 GatedExecution synthesis initiative. Established 70/30 effort allocation rule (active iteration vs new candidates). Reduced sourcing sweep cadence from ~biweekly to ~6-weekly with target-gap protocol (§5.6). Added 3 lessons (#15, #16, #17). Prior v4.3 archived to `AlgoTrading_Research_Log_v4.3_archive_2026-04-17.md`. Companion audit doc: `Research_Audit_2026-04-17_Findings_and_Path_Forward.md`. |
 | 2026-04-09 | v4.3 — Candidate M ARCHIVED (Phase 0 NO-GO). N added. Lessons #13, #14. (See archive.) |
