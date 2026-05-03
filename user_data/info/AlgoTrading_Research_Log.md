@@ -13,7 +13,7 @@
 
 **v5.0 changes (2026-04-17):** A process audit found that the prior 7-point evaluation filter had a 0/4 hit rate among PASS / STRONG PASS candidates that reached Phase 0. The filter was scoring buildability and literature fit, not edge. v5.0 rebuilds the workflow around a multi-stage gate (buildability → edge deflation → paper replication → Phase 0 economics → Phase 1 forward), introduces filter-precision tracking and a workflow kill criterion, refocuses effort on the only two strategies with real-time validation feedback (LiqCascade, OracleSurfer), and frames a synthesis initiative (GatedExecution) that combines lessons from archived candidates rather than repeatedly drawing fresh papers.
 
-**v5.1 changes (2026-05-03):** Sourcing protocol restructure. The v5.0 multi-stage gate is working as designed (Candidate O was correctly rejected at §6.1 for 4/7; Candidate N investigation correctly archived at step 3) — but the *upstream* candidate flow is still drawing from broad academic / practitioner sources with novelty bias, which has produced 0/7 wins. v5.1 narrows sourcing along three structural axes derived from the project's own evidence (Lesson #3, Lesson #17): structural-alpha sources, gate-shaped signals for §4.5 GatedExecution, and capital-efficiency / portfolio-construction overlays. §5, §5.5, §5.6 restructured around these axes. §4.6 sequencing expanded to 8 numbered steps reflecting the May–June 2026 plan (4 sessions of active work between now and LiqCascade Phase 4 resolution, then 2 trigger-based steps post-resolution). Sweep #6 trigger language tightened: the sweep produces queued candidates only — no implementation work begins until LiqCascade resolves. Lesson #18 added.
+**v5.1 changes (2026-05-03):** Sourcing protocol restructure. The v5.0 multi-stage gate is working as designed (Candidate O was correctly rejected at §6.1 for 4/7; Candidate N investigation correctly archived at step 3) — but the *upstream* candidate flow is still drawing from broad academic / practitioner sources with novelty bias, which has produced 0/7 wins. v5.1 narrows sourcing along three structural axes derived from the project's own evidence (Lesson #3, Lesson #17): structural-alpha sources, gate-shaped signals for §4.5 GatedExecution, and capital-efficiency / portfolio-construction overlays. §5, §5.5, §5.6 restructured around these axes. §4.6 sequencing expanded to 8 numbered steps reflecting the May–June 2026 plan (4 sessions of active work between now and LiqCascade Phase 4 resolution, then 2 trigger-based steps post-resolution). Sweep #6 trigger language tightened: the sweep produces queued candidates; evaluation (§6.1–§6.3) can begin immediately; Phase 0+ build work is gated behind §6.2 clearance. Lesson #18 added.
 
 **What it contains:**
 - **Roles & Objectives (§1–§2):** Who we are to each other and what we're trying to achieve. Claude is an equal partner, not an assistant.
@@ -34,7 +34,7 @@
 **Workflow at a glance (Cursor + claude.ai):**
 
 *Track 1 — Research (claude.ai web sessions):*
-1. **Sourcing Sweeps:** Reduced cadence (no more than one sweep per ~6 weeks of calendar time, OR after a Phase 1 outcome on an active candidate, whichever is later). v5.1: each sweep covers all three structural axes (§5) and produces queued candidates only — no implementation work begins until ACTIVE strategies resolve their go/no-go gates. Quality > quantity. See §5 for sources, §5.5 for axis-organized search terms, §5.6 for sweep protocol.
+1. **Sourcing Sweeps:** Reduced cadence (no more than one sweep per ~6 weeks of calendar time, OR after a Phase 1 outcome on an active candidate, whichever is later). v5.1: each sweep covers all three structural axes (§5) and produces queued candidates; evaluation (§6.1–§6.3) can begin immediately; Phase 0+ build work gated behind §6.2 clearance. Quality > quantity. See §5 for sources, §5.5 for axis-organized search terms, §5.6 for sweep protocol.
 2. **Candidate Evaluation:** Two-stage gating. (a) The 7-point Buildability Filter (§6.1) — necessary but not sufficient. (b) The Edge Deflation Pass (§6.2) — mandatory. Only candidates clearing both proceed to a Paper Replication Checklist (§6.3) and Dev Plan.
 3. **Priority Ranking:** §4.6 reflects effort allocation, not just candidate ordering. The 70/30 rule (§4.6) is the operating principle until further notice.
 4. **Dev Plan Creation:** For the top-ranked candidate that has cleared §6.2, Claude creates a Dev Plan a Cursor session can execute from without conversation history.
@@ -66,6 +66,18 @@
 - `user_data/info/GatedExecution_Dev_Plan.md` — GatedExecution synthesis initiative (v0.1 skeleton, 2026-05-03)
 - `deploy/digitalocean.md` — DigitalOcean deployment reference
 - OracleSurfer — in `Freqtrade` repo (separate): `user_data/strategies/OracleSurfer_v14_PROD.py` (ACTIVE dry-run)
+
+**Document scope rules — what lives here vs. in companion files:**
+
+- **This file is the single source of truth.** A future session reading only this file should have every actionable fact needed to resume work. External documents should either be Dev Plans / Deep Dives (which *implement* decisions made here, not *inform* them) or reference appendices that this file already summarizes.
+- **Ephemeral handoff briefs** (`Cursor_Next_Steps_*.md`, web session → Cursor handoffs) are deleted after their items are completed and absorbed into this file (§4.6, §8, §10). They are not cumulative.
+- **Dev Plans** are implementation documents for a specific candidate or initiative. They contain commands, phase gates, file paths, and integration details. They should not contain new research decisions or evaluation outcomes that aren't reflected here.
+- **Deep Dives** are narrative companions to Dev Plans — results, analysis, post-mortems. The verdict and key numbers from any Deep Dive must appear in §4 (Approach Registry) or §8 (Sweeps) as a summary. The Deep Dive is the appendix; this file is the primary record.
+- **Templates** (`Templates/`) are reusable scaffolding — not session-specific. Referenced from the relevant process section (§6.2 in the case of the deflation worksheet).
+- **One-off reports** (like `HS_Empirical_Test_*.md`) should have their key findings in §8 and a pointer to the report for methodology details. The Research Log alone must be sufficient for decision-making.
+- **No new document types without justification.** If a session produces a `.md` that isn't a Dev Plan, Deep Dive, Template, or handoff brief, it's either inlined here or it shouldn't exist.
+
+**File length note (2026-05-03):** This file is ~940 lines / ~28k tokens. It remains readable in a single pass. If it exceeds ~1,500 lines / ~45k tokens, consider: (1) condensing version history entries to one-line summaries, (2) moving detailed sweep records to a separate Sweep Log and keeping only the current-sweep summary here, (3) archiving completed lessons to a Lessons Log and keeping only the past 2 years' lessons here. Not urgent — flag if observed.
 
 ---
 
@@ -345,7 +357,7 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 
 **Sequenced priorities (do in order, do not parallelize):**
 
-> **Next actionable session work: step 6 (Sourcing Sweep #6).** Steps 1–2 passive monitoring; steps 3–5 complete. Sweep #6 eligible 2026-05-19 per original trigger, or earlier now that step 5 is complete per §5.6. Per §5.6 hard constraint: candidates produced are queued for §6.2 deflation only — no implementation work begins until LiqCascade Phase 4 resolves.
+> **Current state (2026-05-03):** All steps 1–6.6 complete. No active implementation work remains — all next actions are passive monitoring (step 7) until LiqCascade Phase 4 resolves at ~50 closed V06 trades or ~2026-05-16. Per §5.6 hard constraint: no implementation work on Sweep #6 candidates until Phase 4 resolves. Optional preparation work (pre-deflation reads, gate calibration) completed this session.
 
 1. **LiqCascade Phase 3.6** (passive, 2–3 week soak). V06 counter-trend deployed 2026-05-02 alongside V05 on droplet. Reassess at 50 closed trades or ~2026-05-16. Kill criterion: short PF < 1.0 → archive permanently.
 
@@ -357,11 +369,17 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 
 5. **✓ DONE (2026-05-03) — GatedExecution Dev Plan v0.1 skeleton.** `GatedExecution_Dev_Plan.md` created. Signal interface contract (§2: `{direction, confidence, freshness}` per pair per candle), gate catalog (§3: 4 CONFIRMED gates + 4 CANDIDATE gates + primary-signal placeholder), combinator logic (§4: `min_agreeing_gates`, weighted confidence, mandatory flags, independence requirement), unified risk/exit framework (§5: ATR trailing + ROI ladder + time stop + inverse-vol sizing). Primary-signal slot left as placeholder — invariant under both LiqCascade Phase 4 outcomes. Implementation phases deferred to v1.0 (post-Phase-4). Open design questions logged (§8).
 
-6. **← NEXT — Sourcing Sweep #6** (1 session, eligible now that steps 3–5 complete, OR 2026-05-19 per original trigger). Run under the revised §5 / §5.6 v5.1 protocol — three narrow targeted gaps (structural alpha, gate-shaped signals, capital-efficiency overlays). **Hard constraint:** any candidate produced is queued for §6.2 deflation only; no implementation work begins until step 1 (LiqCascade Phase 4) resolves.
+6. **✓ DONE (2026-05-03) — Sourcing Sweep #6** (first sweep under v5.1 three-axis protocol). Four candidates queued for §6.2 deflation. **Post-sweep article reads** (Hoyle/Shephard 2018, Yuyama 2023, Glassnode GEX Dec 2025) revised total expected survivors from 1.20 to 0.90 — see §8 Sweep #6 entry for full retrospective and revised estimates. Hard queueing constraint enforced — no implementation work until LiqCascade Phase 4 resolves.
 
-7. **LiqCascade Phase 4 resolves** (passive trigger). Outcome determines step 8.
+6.5. **✓ DONE (2026-05-03) — Hoyle & Shephard empirical test on existing strategy PnL + §6.2 worksheet template.** [...] Both items improve project infrastructure and inform downstream deflation passes; neither is a new candidate build.
 
-8. **GatedExecution Dev Plan finalized + highest-priority §6.2-passing candidate from Sweep #6 enters deflation.** If LiqCascade GO: cascade detection becomes primary signal in GatedExecution. If LiqCascade NO-GO: the highest-conviction Sweep #6 candidate (likely a structural-alpha source per §5.6) is evaluated for the primary-signal slot.
+6.6. **✓ DONE (2026-05-03, optional) — B1/B2 pre-deflation reads + full gate calibration (EMA200 + CRISIS multi-year) + Sourcing Sweep #7 + queueing constraint refined.** Four items executed as preparation work. (a) B1/B2 reads revised Sweep #6 aggregate expected survivors 0.90 → 0.71. (b) EMA200 gate CONFIRMED as directional qualifier; CRISIS gate: 0% FP on 6-week forward window, 5/7 true-positive on 2022-2025 crisis events with structural limitation (rolling p90 adapts too fast during clustered crises). (c) Sweep #7: 0 candidates promoted (1 investigation noted: token-unlock short bias). (d) §5.6 rule 5 refined: §6.1-§6.3 evaluation can begin immediately; only Phase 0+ builds gated behind §6.2 clearance. See §8 for full results.
+
+7. **LiqCascade Phase 4 resolves** (passive trigger). Outcome determines step 8 deflation order.
+
+8. **GatedExecution Dev Plan finalized + Sweep #6 queued candidates enter deflation.** Order depends on LiqCascade outcome:
+   - **LiqCascade GO** (short PF ≥ 1.0 at 50 trades): cascade detection fills primary-signal slot. Deflation order: C1 → B1 → A1+B2 (all advisory/sub-signal additions).
+   - **LiqCascade NO-GO** (short PF < 1.0 at 50 trades): primary-signal slot is open. Deflation order: A1 (as primary-signal candidate, *contingent on §6.1 buildability resolution given Glassnode data-cost concern*) → C1 → B1 → B2.
 
 *This ranking reflects the state of knowledge as of **2026-05-03** (v5.1 sourcing protocol restructure). Update after every checkpoint outcome.*
 
@@ -474,7 +492,7 @@ Each sweep MUST:
 
 4. **For every promoted candidate, populate §6.3 Paper Replication Checklist at sweep time, not later.** Without this, the candidate does not count as "surfaced" — only "noted."
 
-5. **Hard queueing constraint (v5.1):** Any candidate produced by a sweep is queued for §6.2 deflation only — **no implementation work begins until current ACTIVE strategies have resolved their go/no-go gate**. This breaks the historical pattern where each sweep produced an immediate new #1 priority (J → M → L), all of which subsequently failed. The sweep's deliverable is *queued, deflation-ready candidates*, not "what to build next."
+5. **Queueing constraint (v5.1, refined 2026-05-03):** A candidate produced by a sweep enters the evaluation pipeline immediately — §6.1 buildability filter, §6.2 edge deflation pass, and §6.3 paper replication checklist can all begin without waiting for ACTIVE strategies to resolve. What is gated: **no Phase 0+ build work** (empirical backtest, strategy code, config files, deploy infrastructure) on a candidate that hasn't cleared §6.2. This preserves the protection against the "sweep → immediately build → fail" pattern (J → M → L, 0/7) while allowing evaluation work to proceed during ACTIVE-strategy soak periods. The original v5.1 rule ("no implementation work until ACTIVE strategies resolve") was too blunt — it created dead time when no Phase 0 work was pending and all §4.6 items were complete. The refined rule correctly distinguishes evaluation (§6.1–§6.3) from implementation (Phase 0+).
 
 6. **End with a single co-investigator recommendation per axis** (which one — or none — to advance from each axis), plus a cross-axis ranking if multiple advance. Recommendations must be honest about expected post-deflation survival.
 
@@ -529,6 +547,8 @@ Each sweep MUST:
 ### 6.2 Stage 2 — Edge Deflation Pass (mandatory, v5.0)
 
 *Apply the following deflations to the paper's headline results before the candidate is allowed to proceed to a Dev Plan. If after deflation the candidate still meets the bar in §6.2.5, advance. Otherwise reject or refer to §4.5 GatedExecution as a sub-signal.*
+
+**Template & worked example:** `Templates/Edge_Deflation_Worksheet_TEMPLATE.md` (blank reusable template) and `Templates/Edge_Deflation_Worksheet_CandidateL_WORKED_EXAMPLE.md` (populated from Candidate L's completed deflation in `EnhancedCointPairs_Deep_Dive.md` Part 8). Use the template for all future §6.2 passes; use the worked example as the canonical reference for how each section should be completed.
 
 #### 6.2.1 Sharpe / return decay
 - **Default decay factor: 0.5** (Falck & Rej 2022 — average post-publication Sharpe halves; the Palazzi 2025 paper itself cites this).
@@ -739,13 +759,259 @@ These do not enter the precision-tracking table per current definitions (which r
 - Recommendation: M promoted to #1 — subsequently ARCHIVED after V01/V02/V03 long-side failures
 - Notable not promoted: Bollinger Bands regime study (Arda) — flagged as Phase 0 fallback if M failed; Inan funding paper → Technique 7.4; Volume-Weighted TSMOM (Huang) → potential Phase 1 enhancement; LSTM TA on Bitcoin (single asset, black box); VWAP execution (not alpha generation); RSI on BTC (mean reversion fails — confirms architectural choices)
 
-### Sweep #6 — *eligible; steps 3–5 complete 2026-05-03 (v5.1 sourcing restructure, L deflation pass, GatedExecution Dev Plan v0.1)*
-- Trigger: §4.6 step 6 — steps 3–5 complete, sweep eligible immediately. Fallback trigger 2026-05-19 per original 6-week cadence. Hard constraint: candidates produced are queued for §6.2 deflation only; no implementation work begins until LiqCascade Phase 4 resolves.
-- **Target gaps (v5.1 three-axis structure per §5.6):**
-  - **Axis A — Structural alpha:** specific gap TBD at sweep time. Candidate areas: options expiry / dealer hedging flow on BTC and ETH (deepest derivatives terrain in crypto); perp-spot basis dislocations; scheduled token unlock event flow; funding-payment-driven flow at the 8h cadence.
-  - **Axis B — Gate-shaped signals for GatedExecution:** specific gap TBD at sweep time. Candidate areas: directional bias filters complementary to LiqCascade cascade signal; funding-rate predictive gates (Inan SSRN 5576424 already in §7.4 — find newer / complementary work); whale flow directional filter (Technique 7.4 currently RESEARCH).
-  - **Axis C — Capital efficiency:** specific gap TBD at sweep time. Candidate areas: vol-targeting overlay implementable as a Freqtrade `custom_stake_amount`; correlation-aware sizing for multi-pair strategies; drawdown-control overlay applicable to LiqCascade and OracleSurfer simultaneously.
-- **Expected post-§6.2 survivors:** honest estimate to be filled in at sweep time. v5.1 baseline expectation: 0–2 across all three axes combined. If estimate exceeds 2, recalibrate (sycophancy failure mode per §1).
+### Sweep #6 — 2026-05-03 (v5.1 protocol — first sweep under three-axis structure; COMPLETE)
+
+**Output document:** See §8 entry below for full per-axis findings, rationale, and queued deflation order.
+
+**Per-axis results:**
+
+**Axis A — Structural alpha:**
+- Gap targeted: crypto-specific structural-flow phenomena retail can access without latency competition. Searched (i) options dealer hedging / GEX flow, (ii) perp-spot basis as standalone signal.
+- Surfaced: **A1 — Crypto GEX flow** (Glassnode flow-based GEX Dec 2025; supporting MenthorQ, Bookmap, GEXBoard); A2 — Perp basis (Ackerer/Hugonnier/Jermann Wharton 2024, Bocconi BSIC 2025).
+- Promoted: **A1**. Rejected A2 (partially redundant with funding extreme gate already in catalog → §4.3 independence violation).
+
+**Axis B — Gate-shaped signals for GatedExecution:**
+- Gap targeted: gates using *different underlying data* than catalog (catalog covers price, liquidations, funding, OFI, momentum). Missing: on-chain flow, options surface, exogenous macro proxies.
+- Surfaced: **B1 — Stablecoin Exchange Netflow gate** (Unravel Finance Apr 2025; supporting CryptoQuant, Glassnode); **B2 — IV Skew gate** (Wang et al. ScienceDirect 2024; supporting Hoang & Baur SSRN 2020, Amberdata).
+- Promoted: **B1**, conditionally **B2** (only if A1 promoted — they share Deribit data infrastructure, marginal cost low).
+- Critical pre-deflation finding for B2: BTC IV curve is "more symmetric" than equity IV curves (Wang et al.) — left/right slope ratio ~3:1 BTC vs ~10:1 equities at daily maturity. Skew exists but signal magnitude is structurally weaker in BTC than in S&P 500. Honest pre-§6.2 expectation: low directional information content in BTC, possibly stronger in alts.
+
+**Axis C — Capital-efficiency / portfolio-construction overlays:**
+- Gap targeted: overlays that multiply edge from existing signals without depending on directional prediction. Specifically: replacing the placeholder `inverse-vol sizing` in GatedExecution Dev Plan §5.2 with a rigorous, deflation-anchored design.
+- Surfaced: **C1 — Conditional Volatility Targeting** (Bongaerts et al. Tandfonline 2020 + Hoyle & Shephard SSRN 2018 anchor + Yuyama et al. Georgetown SSRN 2023 as crypto-specific replication); C2 — Risk Parity / correlation-aware sizing (Yuyama et al.).
+- Promoted: **C1** with Yuyama et al. 2023 as crypto anchor and Hoyle & Shephard as falsification lens. Held C2 for v1.0 GatedExecution (premature without single-pair baseline).
+
+---
+
+### Sweep #6 — Post-Sweep Article Reads (2026-05-03, same session)
+
+After producing the initial sweep output and survival estimates, the developer obtained and supplied three full-text references for deeper reading. Reading these *before* deflation produced material updates to the survival estimates and identified specific failure modes that the formal §6.2 pass will need to address. **Pre-deflation reading shifted total expected survivors from 1.20 → 0.90 — closer to the lower end of the v5.1 baseline.** This is recorded here so future sessions see the revised numbers, not the initial sweep estimates.
+
+**Read #1: Hoyle & Shephard 2018 (SSRN 3279787) — full paper.** The C1 falsification lens.
+- The headline result: vol scaling improves Sharpe iff `γ₁ ≥ √(1 + S²·γ₂)`, where `γ₁ = ξ₀ + ξ₁`, `ξ₀ = E(σ/σₜ)` is the convexity term (always ≥ 1 by Jensen), and `ξ₁ = Cov(σ/σₜ, μₜ/μ)` is the timing/covariance term.
+- Empirically across 142 futures and FX markets (1988–2017): mean γ₁ ≈ 1.33, median ≈ 1.08. Improvement is driven almost entirely by ξ₀ (convexity, mean ~1.36) — **not by clever timing** (ξ₁ ≈ 0 mean, modestly negative median across categories). The paper does not include any crypto data.
+- Key implication for our project: H&S provides a clean empirical *test* runnable on our own LiqCascade and OracleSurfer realized PnL, but **does not pre-supply a crypto answer**. We need to compute ξ₀, ξ₁, γ₂ from our actual data.
+
+**Read #2: Yuyama et al. 2023 (Georgetown SSRN 4548964) — full paper.** The crypto-specific vol-control replication.
+- 4 allocation methods × 5 vol-control variants × 2017–2022 OOS, BTC + 7 traditional assets.
+- Vol control reliably reduces risk: std dev, VaR, CVaR, Max DD all improve at high statistical significance. Max DD reductions of 60–70% (e.g., reference −33% → VC(4) −5%).
+- **Vol control mostly *fails* to improve Sharpe over the full period.** None of the Sharpe differences are statistically significant. Authors' diagnosis (Section 5): vol control is suitable for assets where return *falls* when risk rises and *rises* when risk falls. Bitcoin in 2018 and 2022 showed the opposite — return and vol both fell. So Bitcoin violates the precondition for vol control to add Sharpe.
+- One narrow exception: during the 2018 and 2022 crypto drawdown years specifically, vol-controlled portfolios produced better Sharpe than the reference in many cases. Bull-year underweighting of BTC dominates in the full-window aggregate.
+
+**Read #3: Glassnode "Introducing: Taker-Flow-Based Gamma Exposure" (Dec 18, 2025).** The A1 methodology source.
+- The article confirms the *conceptual* framing: equity-style GEX heuristic ("calls = investors short, dealers long; puts = investors long, dealers short") fails in crypto because crypto traders actively buy calls to speculate. Glassnode reconstructs GEX using Deribit's taker-vs-maker labels per trade, treating the maker as dealer and inferring net dealer positioning from cumulative taker flow strike-by-strike.
+- **Methodology paper is sales-gated.** The Appendix on page 8 reads verbatim: *"To find out more about our methodology behind this metric, please reach out to your account manager."* The actual mathematical reconstruction — inventory-tracking model, decay/rebalancing rules, greek-computation choices, maker-side breakdown assumptions — is not in the public article.
+- Article's empirical content is a single static snapshot of BTC GEX at one point in time. No backtest, no statistical test of GEX→returns or GEX→realized vol. Disclaimer page 9: *"limited case study with significant constraints… should not be interpreted as investment advice or definitive trading signals."*
+- A1 buildability paths: (1) paid Glassnode Professional feed (~$$$$/month, 10-min resolution, BTC/ETH/SOL/XRP/PAXG, Deribit only); (2) DIY reconstruction from raw Deribit ticks with no public benchmark to validate against; (3) use the equity heuristic that the article explicitly says is broken for crypto. None are clean for §6.2.
+
+**Revised survival estimates after deeper reading:**
+
+| Rank | Candidate | Initial est. | Revised est. | Reason for revision |
+|---|---|---|---|---|
+| 1 | C1 — Conditional Vol Targeting | ~50% | **~30%** | Yuyama 2023 shows naive vol targeting *fails* Sharpe test on BTC because crypto violates the precondition (return-vol asymmetry). Risk-overlay framing (drawdown reduction) more likely path than Sharpe-enhancer framing. |
+| 2 | B1 — Stablecoin Netflow Gate | ~30% | **~30%** | No new info from reads; estimate unchanged. |
+| 3 | A1 — Crypto GEX Flow | ~25% | **~15%** | Glassnode methodology is sales-gated. Buildability path requires either paid feed (cost not budgeted) or DIY-without-benchmark (high effort, no validation reference). May fail §6.1 buildability filter, not §6.2. |
+| 4 | B2 — IV Skew Gate | ~15% | **~15%** | No new info from reads; estimate unchanged. |
+| | **Total expected survivors** | **1.20** | **0.90** | |
+
+**Revised C1 deflation framing.** The original C1 charter was implicit: "improve Sharpe via inverse-vol sizing." Yuyama 2023 makes this unlikely to pass standalone in crypto. However, Yuyama's risk-reduction findings are real and statistically significant. The deflation pass should split C1 into two distinct charters:
+- **C1-Sharpe:** does conditional vol targeting improve Sharpe of LiqCascade/OracleSurfer/GatedExecution PnL? Apply H&S empirical test on actual realized data. Likely fails per Yuyama.
+- **C1-Risk:** does conditional vol targeting reduce drawdown / improve Calmar without materially hurting net return? Apply Yuyama-style asymmetric test. More likely passes.
+
+If C1-Sharpe fails but C1-Risk passes, integrate as a *risk overlay* in Dev Plan §5.2 rather than as a *Sharpe-enhancing sizing rule*. This is a legitimate narrowing per §6.2 protocol — not lowering the bar, but recognizing that risk overlays should be deflated against drawdown/Calmar criteria, not return/Sharpe.
+
+**Revised A1 buildability concern.** A1 may fail §6.1 buildability before reaching §6.2 unless one of: (a) project budgets the Glassnode Professional cost, (b) developer commits effort to DIY reconstruction with custom assumptions and no benchmark, or (c) the equity heuristic is used despite Glassnode's own statement that it's broken for crypto. Decision on A1 path needs to happen at §6.1 stage when the candidate is pulled from the queue — not assumed.
+
+**B2 dependency on A1.** B2 was conditionally promoted only if A1 was built (shared Deribit infrastructure). If A1 fails §6.1 buildability and is not built, B2's marginal-cost argument disappears and B2 likely fails its own §6.1 too.
+
+---
+
+### Sweep #6 — Hoyle & Shephard Empirical Test on Realized PnL (2026-05-03)
+
+Per `Cursor_Next_Steps_2026-05-03.md` Item 1: ran the Hoyle & Shephard 2018 (SSRN 3279787) empirical vol-scaling test on LiqCascade (771 forward dry-run closed trades, V04+V05, 2026-03-17 to 2026-05-03) and OracleSurfer (11 trades — insufficient sample). Full report: `HS_Empirical_Test_LiqCascade_OracleSurfer_2026-05-03.md`. Analysis script: `user_data/scripts/hs_empirical_test.py`.
+
+**Key finding — LiqCascade combined (771 trades, μ = −0.00407, σ = 0.01570, S = −0.259):**
+
+Under the EWMA 12-day half-life vol process (HS baseline, constant μ): ξ₀ = 0.992, ξ₁ = 0, γ₁ = 0.992, γ₂ = 0.003. HS test **FAILS** (γ₁ < 1.0001). Sσ = −0.257 vs S = −0.259 — marginal Sσ − S = +0.002.
+
+Under the 30-day rolling std vol process (robustness, constant μ): ξ₀ = 1.047, γ₁ = 1.047. HS test **technically PASSES**, but Sσ = −0.271 — Sσ − S = −0.012. Because S < 0, γ₁ > 1 makes Sσ *more* negative (vol scaling amplifies a negative-expectancy process).
+
+**Key finding — LiqCascade shorts only (346 trades, S = −0.165):** ξ₀ = 0.878 under EWMA — the most extreme ξ₀ < 1 in any slice. Short trades cluster most strongly in high-vol periods. γ₁ = 0.878. HS test FAILS. Sσ − S = +0.020 — vol scaling dampens losses slightly by reducing exposure in high-vol windows, but the convexity mechanism that makes vol scaling *improve* Sharpe (ξ₀ ≈ 1.36 in HS's 142-market dataset) is structurally absent.
+
+**Key finding — LiqCascade longs only (425 trades, S = −0.336):** ξ₀ = 1.210 under EWMA — the only slice with ξ₀ > 1. But S < 0 means γ₁ > 1 makes Sσ worse: Sσ − S = −0.069. This is the worst-case interaction: vol scaling boosts convexity on a negative-Sharpe directional leg.
+
+**OracleSurfer:** 11 closed trades — far below 50-trade minimum. Not actionable. Numbers reported in the full report for completeness.
+
+**Implication for C1 deflation estimates:**
+- The HS test on our actual PnL provides a data-driven prior that C1-Sharpe (naive vol targeting for Sharpe improvement) is **very unlikely to pass §6.2**. The convexity mechanism that makes vol scaling work in traditional futures (ξ₀ ≈ 1.36) is absent in our liquidation-cascade PnL (ξ₀ ≈ 0.99 under EWMA). Trades cluster in high-vol periods — vol scaling reduces exposure when the signal is most active, not when it's most noisy.
+- C1-Risk (vol scaling for drawdown reduction) is more viable. ξ₀ < 1 means position sizes are reduced in high-vol periods, which are when the strategy is producing its worst returns. This would reduce drawdowns even if it doesn't improve Sharpe — consistent with Yuyama 2023's finding of 60–70% Max DD reduction from vol control.
+- **Revised C1 survival estimate:** ~20% for C1-Sharpe (down from post-sweep 30%), ~40% for C1-Risk. Combined probability of at least one framing passing: ~40% (unchanged — the risk framing was always the more likely path).
+- **C1 survival estimate in the post-sweep reads table (§8, above) remains ~30%** for the combined C1 entry — the HS test adds evidence but doesn't warrant a formal table revision until the §6.2 deflation pass runs. The post-sweep reads revision (50% → 30%) incorporated Yuyama 2023's general crypto finding; the HS test is the strategy-specific confirmation of that finding on our PnL data.
+
+---
+
+### Sweep #6 — B1 & B2 Pre-Deflation Reads (2026-05-03)
+
+After the initial post-sweep reads on C1/A1 references shifted estimates materially, B1 and B2 (which did NOT get full-text reads at sweep time) were re-examined with deeper reading to prevent late-surprise estimate drift at deflation time.
+
+**B1 — Stablecoin Exchange Netflow Gate:**
+- **Source quality:** Unravel Finance blog post (April 2025) is a practitioner piece with conceptual framing, not quantitative research. MEXC blog provides similar conceptual overview. CryptoQuant provides the raw data via free-tier API.
+- **Signal:** Stablecoin inflows to exchanges = buying power ("dry powder"); outflows = risk-off. Predicts only at extremes — particularly: very low inflows are bearish for medium-term forward returns. Asymmetric.
+- **Evidence quality: ANECDOTAL.** The MEXC article cites exactly one data point ($1.5B USDT inflows → ~12% BTC rally "shortly after"). Unravel Finance provides no hit rates, Sharpe ratios, or backtest results. No academic paper was found for this signal.
+- **Data availability:** CryptoQuant free-tier API, Unravel Finance free dashboard. Buildable.
+- **Limitations:** (1) No defined threshold — what constitutes a "spike" is never quantified. (2) Signal is only predictive at one extreme, not as a continuous indicator. (3) Authors explicitly warn against using flows in isolation. (4) 2025 structural changes (non-USD stablecoins, institutional adoption, regulatory clarity) may break historical patterns. (5) No false-positive rate is available.
+- **§6.2 deflation implication:** Unlike C1 (which had a clear HS falsification framework) and A1 (which had data-cost barriers), B1 has no published quantitative evidence to deflate. The §6.2 pass would require building an empirical test from scratch rather than deflating published results — a higher bar. The signal is directionally plausible (capital flows → future buying/selling pressure is a real mechanism) but untested.
+- **Revised survival estimate: ~15–20%** (down from 30%). The 30% sweep-time estimate was overly generous for a signal with zero quantitative validation. Conceptual merit only.
+
+**B2 — IV Skew Gate:**
+- **Source quality:** Wang et al. (2024) "Implied volatility slopes and jumps in bitcoin options market" — ScienceDirect, behind paywall (abstract only accessible). Hoang & Baur (2020) SSRN paper not found via public search. Supporting sources (Amberdata blog, pi42.com) are introductory/educational content, not quantitative research.
+- **Key finding from Research Log sweep-time flag:** BTC IV curve is "more symmetric" than equity IV curves — left/right slope ratio ~3:1 BTC vs ~10:1 equities at daily maturity. This means the signal magnitude is structurally weaker in BTC than in traditional equity options.
+- **Evidence quality: UNTESTED for directional prediction.** Available public content discusses IV skew conceptually but provides zero backtests linking skew to forward returns at any horizon. The ScienceDirect paper may contain quantitative evidence behind the paywall, but without access it cannot be evaluated.
+- **Data dependency:** B2 was conditionally promoted only if A1 (Crypto GEX Flow) was built — they share Deribit options data infrastructure. A1 was revised to ~15% survival due to Glassnode data costs. If A1 fails §6.1 buildability (likely), B2 loses its marginal-cost argument and likely fails §6.1 itself.
+- **Revised survival estimate: ~5–10%** (down from 15%). The dependency on A1 + the structural BTC skew symmetry weakness + zero accessible quantitative evidence make this the weakest queued candidate.
+
+**Aggregate revised estimates after all four pre-deflation reads:**
+
+| Rank | Candidate | Sweep est. | Post-C1/A1 reads | Post-B1/B2 reads | Net change |
+|---|---|---|---|---|---|
+| 1 | C1 — Conditional Vol Targeting | 50% | 30% | 30% | — |
+| 2 | B1 — Stablecoin Netflow Gate | 30% | 30% | **~18%** | −12pp |
+| 3 | A1 — Crypto GEX Flow | 25% | 15% | 15% | — |
+| 4 | B2 — IV Skew Gate | 15% | 15% | **~8%** | −7pp |
+| | **Total expected survivors** | **1.20** | **0.90** | **~0.71** | −0.19 |
+
+The net downward drift from 1.20 → 0.71 across all pre-deflation reads is honest and consistent with v5.1 baseline (0–2 survivors expected). The process of reading before deflation is working as designed — every read has reduced rather than increased survival estimates, indicating the sweep-time estimates had optimism bias.
+
+---
+
+### Sweep #6 — Gate Calibration on LiqCascade Realized PnL (2026-05-03)
+
+Ran the two CONFIRMED gates that can be calibrated from OHLCV data (EMA200, CRISIS) against all 774 LiqCascade forward dry-run trades (V04+V05, 2026-03-17 to 2026-05-03, 5 pairs). Each trade was tagged with whether the gate would have allowed or blocked it based on daily data at entry. OI gate deferred — requires sidecar OI log data. Script: `user_data/scripts/gate_calibration.py`. Output: `user_data/results/gate_calibration_tagged_trades.csv`.
+
+**EMA200 Gate (block longs below daily EMA200, block shorts above):**
+- **Hit rate:** 55.2% of trades blocked (427/774). Consistent across all 5 pairs (52–60%).
+- **Directional breakdown:** ALL 427 blocked trades were longs (price was below EMA200 for the entire period — bearish/ corrective regime). ALL 347 shorts were allowed (correctly: price below EMA200, shorts are with-trend).
+- **P&L of blocked vs allowed:** Blocked (all longs): avg −0.53%, 64.2% losing, sum −$3,503. Allowed (all shorts): avg −0.25%, 57.6% losing, sum −$1,352. P&L delta: −0.27% (blocked trades are WORSE).
+- **Calibration verdict:** The gate correctly identified that longs were the worse direction during this bearish period. It functioned as a directional qualifier ("trade with the trend") rather than an entry-quality filter within direction. This is exactly its intended role in GatedExecution — it doesn't need to predict P&L, only to block the wrong direction. **CONFIRMED effective as a directional qualifier.**
+
+**CRISIS Gate (block all entries when ATR > 90th percentile rolling 30d):**
+- **Hit rate:** 0.0% (0/774 trades blocked). 
+- **Interpretation:** During this 6-week period (Mar 17 – May 3, 2026), none of the 5 pairs experienced a day where ATR exceeded its 90th percentile. This was "normal" crypto volatility — elevated relative to traditional assets, but not crisis-level for crypto. The gate correctly stayed off.
+- **Calibration verdict:** Zero false positives during a period of active liquidation-cascade trading. The gate does NOT fire spuriously during "normal high vol" — it reserves blocking for genuine tail events. The true positive rate (does it correctly block during crisis events like March 2020, May 2021, Nov 2022 FTX?) cannot be evaluated from this dataset. **CONFIRMED no false-positive problem.** True-positive calibration requires a multi-year dataset that includes crisis events.
+
+**Limitations of this calibration:**
+1. **Single regime.** Mar–May 2026 was a corrective/bearish period. A full bull-bear-chop cycle calibration would reveal regime-dependent behavior.
+2. **No OI gate.** The OI confirmation gate (validated on shorts in LiqCascade Phase 3.5) requires the sidecar OI log — not in the trade DB.
+3. **6-week window.** Not long enough to catch crisis events for CRISIS gate true-positive calibration.
+
+### Multi-Year CRISIS Gate True-Positive Calibration (2026-05-03)
+
+Extended the CRISIS gate calibration to 2022-2025 daily data (1556 days, all 5 LiqCascade pairs). Measured whether the gate fired during 7 known crisis events that fall within the data range. Script: `user_data/scripts/crisis_calibration_multiyear.py`.
+
+**Headline: the gate has meaningful crisis detection capability but is not a reliable crisis detector.**
+
+**BTC crisis rate:** 12.6% of days (196/1556). Range across pairs: 12.6% (BTC) to 15.0% (ETH). This is higher than expected — the gate fires on roughly 1 in 8 trading days, not just during tail events.
+
+**Known event detection (BTC):** 5/7 events detected. LUNA collapse (May 9-12, 2022), FTX collapse (Nov 8-10, 2022), Japan carry trade unwind (Aug 5, 2024), and Trump tariff shock (Feb 3, 2025) all triggered the gate. **Two events MISSED:**
+
+- **3AC/Celsius insolvency (Jun 13, 2022):** Ratio 0.87 — ATR was below the rolling 90th percentile because LUNA had elevated vol for the preceding month. The gate adapted to the new normal.
+- **Liberation Day tariffs (Apr 2, 2025):** Ratio 0.59 — similar issue. The gate measures "is today's vol unusual given the last 30 days," not "is this a crisis."
+
+**Structural limitation identified:** When crisis events cluster (LUNA → 3AC within 5 weeks; 2025 tariff shocks), the rolling p90 adapts upward and the gate stops firing. The gate goes blind when crisis becomes the new normal. This is inherent to the rolling-percentile design.
+
+**Per-year distribution:**
+
+| Pair | 2022 | 2023 | 2024 | 2025 | 2026 (Q1) | Overall |
+|------|------|------|------|------|-----------|---------|
+| BTC | 7.9% | 13.7% | 17.2% | 11.8% | 11.6% | 12.6% |
+| ETH | 7.4% | 18.1% | 21.6% | 13.4% | 13.7% | 15.0% |
+| SOL | 6.3% | 18.9% | 17.8% | 8.5% | 11.6% | 12.8% |
+| XRP | 10.4% | 17.5% | 19.7% | 7.4% | 8.4% | 13.4% |
+| BNB | 8.2% | 16.4% | 17.8% | 13.4% | 12.6% | 13.9% |
+
+2023-2024 had the highest crisis rates — consistent with elevated vol during the 2023 recovery chop and 2024 bull corrections. 2022 (the actual bear-market crisis year) had the lowest rate because the higher base vol raised the bar.
+
+**Avg absolute daily returns:** Crisis days: 3.65–6.73% across pairs. Significantly higher than normal days — the gate does isolate elevated-vol regimes. But the 12-15% hit rate means ~45-55 crisis days per year per pair. At LiqCascade's trade rate (~4 trades/day across 5 pairs), this would block ~50-70 trades/year, some of which would be during genuine opportunity windows where the gate's crisis detection value is ambiguous.
+
+**Calibration recommendation for GatedExecution v1.0:**
+1. **Keep the CRISIS gate as mandatory** — it detected 5/7 major crisis events and fires on genuinely elevated-vol days (avg abs return 2-3× normal).
+2. **Add per-pair calibration** — crisis rates vary by pair (SOL 12.8% vs ETH 15.0%). Different thresholds per pair would reduce the hit-rate dispersion.
+3. **Consider a longer lookback (60d or 90d)** for the rolling percentile to reduce adaptation speed during clustered events. The 30d window adapts too fast — it misses the second event in a cluster.
+4. **Do NOT rely on this gate alone for crisis protection** — it will miss the second event in a crisis cluster, which is exactly when a strategy bleeding from the first crisis is most vulnerable.
+5. **Gate interaction:** The EMA200 gate would have also blocked long entries during most crisis events (prices tend to be below EMA200 during crises). The combined EMA200 + CRISIS gate overlap provides partial redundancy for the missed events.
+
+---
+
+### Sweep #6 Retrospective (2026-05-03)
+
+Honest retrospective on the v5.1 three-axis sourcing protocol's first execution. Goal: improve Sweep #7 protocol if v5.1 is retained.
+
+**What worked:**
+1. **Per-axis allocation forced exploration of unexplored terrain.** Without the three-axis structure, the developer's instinct (and Claude's) would have searched broadly and likely re-found archetype candidates. Axis C (capital efficiency) is genuinely new ground for this project — would not have been searched in a generic sweep.
+2. **Hard queueing constraint held.** No implementation work was started during or immediately after the sweep. The developer's "let's bang out a new candidate" suggestion was checked against Lesson #17 and redirected to non-candidate work. This is exactly the failure mode v5.1 §5.6 was built to prevent.
+3. **Per-axis hit-rate calibration produced honest estimates that survive scrutiny.** The initial 1.20-survivor estimate was honest (within v5.1 baseline of 0–2). The post-reading revision to 0.90 is also honest. No sycophancy creep.
+4. **Sweep-time §6.2-relevant facts captured.** B2's BTC-symmetry weakness, A1's data-infrastructure burden, and C1's Yuyama-applicable failure mode were all flagged at sweep time, not as discoveries during deflation. This compounds — every flag at sweep time is one less surprise during deflation.
+
+**What didn't work / what to fix in Sweep #7:**
+1. **§6.3 Paper Replication Checklists were deferred, not populated at sweep time.** v5.1 §5.6 explicitly requires populating §6.3 at sweep time. The deferral is a real protocol deviation. **Sweep #7: enforce §6.3 population at sweep time, no exceptions.** If a candidate cannot be §6.3-populated at sweep time, it is "noted" not "surfaced" and goes to a watch-list, not the deflation queue.
+2. **Token-unlock event-flow systematic literature did not surface at this search depth.** Searched for "options dealer hedging" and "perp basis" as Axis A representatives, but did not separately search for "token unlock trading," "vesting cliff trading," or "scheduled airdrop." These were in the §5.5 Axis A search-term list but the sweep prioritized derivatives terrain. **Sweep #7 (or #6 follow-on if Sweep #6 produces no §6.2 survivors): targeted search on token-unlock event flow.** Possible reasons it didn't surface here: (a) literature genuinely thin, (b) wrong search terms, (c) buried in practitioner blogs we didn't reach. Axis A in Sweep #7 should explicitly start with token unlocks before moving to derivatives.
+3. **ETF-rebalance flow same as above.** Was on the §5.5 list, not searched in this sweep. Sweep #7 should cover.
+4. **Post-sweep article reads materially shifted estimates.** This is a process observation: sweep-time abstracts contain less failure-mode information than full-text reads. The C1 estimate fell from 50% → 30% on full-text reading of Yuyama; A1 from 25% → 15% on the Glassnode article. **Implication for protocol:** for the top 1–2 candidates per axis, full-text reading should happen *before* the sweep concludes, not after. This adds time per sweep but reduces post-sweep estimate drift. Sweep #7 should require full-text reads for any candidate with sweep-time survival estimate ≥ 25%.
+5. **Practitioner-blog source quality varied wildly.** Glassnode, Amberdata, Deribit Insights, Unravel Finance produced data-rigorous content. Gate.com produced obvious marketing-content listicles ("5 critical signals," "$20 billion in options OI provides…"). **Sweep #7: maintain a source-quality whitelist/blacklist updated per sweep.** Discount Gate.com, CoinGape, similar to near-zero. Prioritize venue-published research (Deribit Insights, vendor whitepapers from data infrastructure companies).
+6. **No SSRN/arXiv search for academic crypto-GEX work.** Sweep #6 found Glassnode's practitioner content for A1 but did not attempt an academic literature search for "Deribit options dealer flow" or "perpetual options gamma exposure." If A1 fails §6.1 buildability, Sweep #7 should explicitly do this academic search before A1 is retired permanently — there may be a methodologically-published version that doesn't require Glassnode's paid feed.
+
+**Process improvements to fold into v5.1 §5.6 (or v5.2 if accumulated):**
+- Sweep-time §6.3 population is mandatory, not best-effort.
+- Sweep-time full-text reading is required for candidates ≥ 25% estimated survival.
+- Source-quality whitelist/blacklist maintained across sweeps.
+- Each sweep produces an explicit "search NOT done" list for follow-on sweeps.
+
+These improvements do not require an immediate v5.2 release — they can be folded into the next protocol revision whenever §5.6 is next touched.
+
+---
+
+### Sweep #7 — 2026-05-03 (v5.1 protocol; token-unlock event flow, ETF rebalance, + residual Axis B/C gaps)
+
+**Trigger:** Sweep #6 retrospective "search NOT done" list. Targeted token-unlock event flow and ETF-rebalance literature (Axis A), residual gate-shaped signals (Axis B), and unexplored capital-efficiency terrain (Axis C). First sweep under refined queueing constraint (§5.6 rule 5, 2026-05-03 revision) — candidates can enter §6.1 evaluation immediately regardless of ACTIVE strategy state.
+
+**Per-axis results:**
+
+**Axis A — Structural alpha (token unlocks + ETF flows):**
+- **Gap:** Token unlock events as predictable sell-pressure events; ETF creation/redemption flow as forced buying/selling. Both are information-asymmetry / forced-flow mechanisms per Lesson #3.
+- **Token unlocks — mechanism real, academic literature absent.** Practitioner data is rich: Tokenomist (schedules + amounts), Alpha Factory (risk framework), CryptoQuant (on-chain flows). The mechanism is basic economics — scheduled supply increases create predictable sell pressure when insiders/early investors gain transferability. But zero academic event studies with systematic backtests were found. No published hit rates, return distributions, or holding periods.
+- **ETF flows — too young for publication.** Spot BTC ETFs launched Jan 2024 (~2 years of data). Flow data available via Farside, The Block, Bloomberg. But insufficient for a full bull-bear cycle, and academic publication cycles haven't caught up. Not promotable as a candidate until ≥3 years of data exist.
+- **Result: 0 candidates promoted.** Token unlocks are noted as an **INVESTIGATION (token-unlock short bias)** — real mechanism, buildable data, but no paper to deflate. Would require constructing the empirical test from scratch. Eligible for a focused §4.4-style investigation if prioritized.
+
+**Axis B — Gate-shaped signals:**
+- **Gap:** Gate signals using data not already in the catalog (catalog already covers: price, liquidations, funding, OI, OFI, momentum, on-chain flow, options skew). Searched for on-chain flow and exchange reserve signals.
+- **Result: 0 candidates promoted.** The existing gate catalog from Sweep #6 already covers the major signal types. Exchange inflow/outflow data overlaps with B1 (Stablecoin Netflow). No novel signal types surfaced.
+- **Notable: Exchange reserve drawdowns** (coins leaving exchanges → supply shock → bullish) is a widely-discussed practitioner signal with some CryptoQuant analytics, but like stablecoin flows, lacks rigorous backtested evidence. Covered under B1's umbrella — not a separate candidate.
+
+**Axis C — Capital efficiency / portfolio overlays:**
+- **Gap:** Unexplored capital-efficiency terrain beyond C1 (Conditional Vol Targeting).
+- **Result: 0 candidates promoted.** C1 already covers the primary capital-efficiency use case. Kelly-based sizing and risk parity are well-studied in traditional finance but require adaptation to crypto's non-stationary vol and correlation structure — more of a technique than a candidate.
+- **Notable:** Yuyama et al. 2023 (already read for C1) tested 4 allocation methods — the ranking across methods (equal-weight, risk parity, min-variance, max-diversification) was inconclusive in crypto. Not worth a separate candidate.
+
+**Sweep #7 summary:**
+
+| Axis | Target gap | Papers reviewed | Promoted | Reason |
+|------|-----------|----------------|----------|--------|
+| A | Token-unlock event flow | 5+ practitioner sources (Tokenomist, Alpha Factory, CryptoQuant) | 0 | Mechanism real, academic literature absent — noted as INVESTIGATION |
+| A | ETF creation/redemption flow | 3 sources (Farside, Bloomberg, The Block) | 0 | Only ~2yr of data; too young for statistical significance |
+| B | Residual gate-shaped signals | 3 sources | 0 | Catalog already covers major signal types |
+| C | Residual capital-efficiency | 2 sources (Yuyama re-read) | 0 | C1 already covers |
+| | **Total** | **~13** | **0 promoted** | **1 investigation noted (token-unlock short bias)** |
+
+**This is a legitimate sweep outcome per §5.6:** zero candidates promoted does not mean the sweep failed. The search effort covered all three axes. The terrain was genuinely thin for academic literature in the targeted areas. Rejection is a valid outcome.
+
+**Token-unlock investigation charter (for consideration when prioritized):**
+- Mechanism: scheduled token unlocks → supply increase when insiders/early investors can sell → predictable short-term sell pressure
+- Data: Tokenomist (free: upcoming unlocks, amounts, % of supply); CryptoQuant (on-chain flows to exchanges around unlock dates)
+- Test: event study — for every unlock ≥ 1% of circulating supply over 2022-2025, measure the N-day forward return distribution (N = 1, 3, 7, 14, 30 days). Compare to unconditional return distribution. Compute hit rate, mean excess return, and significance.
+- Fee feasibility: short bias (short before unlock, cover after) — single-leg perps on Binance. Should pass Phase 0 fee sweep if effect size ≥ 3% per event (taker fee = 10 bps RT, slippage ~5 bps per trade → requires ~1.5% to breakeven for single-event trades)
+- Buildability: feasible. Tokenomist has free tier. Binance perps cover most tokens with unlock schedules. No sidecar required if run at daily granularity.
+- Risk: effect may be front-run (market prices in unlock before the event). Directional short bias in crypto's secular uptrend carries structural risk. Unlocks of large, liquid tokens (SOL, AVAX) may have minimal impact; small-cap unlocks may be illiquid.
+- **This is NOT a promoted candidate.** It is a scoped investigation for when capacity opens.
 
 ---
 
@@ -789,12 +1055,22 @@ Hard-won insights that apply across all approaches. Add as projects conclude.
 
 18. **(v5.1) Sourcing bias matters as much as evaluation rigor.** The v5.0 multi-stage gate is correctly rejecting weak candidates (O at §6.1, N at investigation step 3). But if every candidate flowing into the gate is drawn from the same archetype that has 0/7 wins, even a perfect gate cannot manufacture a winner. The fix is upstream: bias sourcing toward terrain with structurally different base rates. v5.1 narrows along three axes — structural-alpha sources (where there's a *why* before a *how*, per Lesson #3), gate-shaped signals for §4.5 GatedExecution, and capital-efficiency overlays. The first axis is the highest-conviction; the second is the highest-leverage given current architecture; the third addresses unexplored terrain. *(Sourcing protocol restructure 2026-05-03)*
 
+19. **(v5.1) Sweep-time abstracts contain less failure-mode information than full-text reads.** Sweep #6 produced initial survival estimates of 50% (C1), 30% (B1), 25% (A1), 15% (B2) — total 1.20. After full-text reading of three references the same session (Hoyle & Shephard 2018, Yuyama 2023, Glassnode GEX Dec 2025), estimates revised to 30% / 30% / 15% / 15% — total 0.90. The full-text reads surfaced specific failure modes (Yuyama: BTC violates the precondition for naive vol targeting to add Sharpe; Glassnode methodology is sales-gated requiring paid feed or DIY-without-benchmark) that the abstracts did not. **For sweeps under v5.1 and beyond: full-text reading is required for any candidate with sweep-time survival estimate ≥ 25% — performed *before* the sweep concludes, not as post-hoc revision.** This adds time per sweep but reduces post-sweep estimate drift and produces deflation-ready facts at sweep time. Fold into §5.6 at next protocol revision. *(Sweep #6 retrospective 2026-05-03)*
+
 ---
 
 ## 10. Version History
 
 | Date | Change |
 |---|---|
+| 2026-05-03 | **Sourcing Sweep #7 — token-unlock event flow, ETF rebalance, residual Axis B/C gaps.** First sweep under refined queueing constraint (§5.6 rule 5 revision). Three axes covered, ~13 sources reviewed. **0 candidates promoted.** Token unlocks: real mechanism (supply dilution), rich practitioner data (Tokenomist, CryptoQuant), but zero academic event studies with backtests. Noted as INVESTIGATION (token-unlock short bias) with scoped investigation charter. ETF flows: too young (~2yr spot BTC ETF data) for publication cycles. Axis B: gate catalog already covers major signal types. Axis C: C1 already covers. Honest sweep outcome — rejection is valid per §5.6. |
+| 2026-05-03 | **Multi-year CRISIS gate true-positive calibration (2022-2025).** Extended calibration to 1556 daily candles per pair. BTC crisis rate 12.6% of days (range 12.6–15.0% across pairs). Detected 5/7 known post-2022 crisis events (LUNA, FTX, Japan carry, Trump tariff). Missed 3AC/Celsius (p90 adapted upward after LUNA) and Liberation Day tariffs. Structural limitation: rolling 30d percentile adapts too fast during clustered events — gate goes blind when crisis becomes the new normal. Per-year rates: 2022 lowest (6.3–10.4%), 2023-2024 highest (13.7–21.6%). Recommendation: keep gate mandatory, add per-pair calibration, consider longer lookback (60d/90d). Script: `user_data/scripts/crisis_calibration_multiyear.py`. |
+| 2026-05-03 | **Queueing constraint refined (§5.6 rule 5).** Original v5.1 rule ("no implementation work until ACTIVE strategies resolve") was too blunt — created 13 days of dead time. Refined to: §6.1–§6.3 evaluation can begin immediately on new candidates; only Phase 0+ build work is gated behind §6.2 clearance. This correctly distinguishes evaluation from implementation while preserving the protection against the "sweep → build → fail" pattern (0/7). Updated in §5.6 rule 5, §5 introduction, and workflow overview. |
+| 2026-05-03 | **Gate calibration on LiqCascade realized PnL (EMA200 + CRISIS gates).** 774 forward dry-run trades (V04+V05, 5 pairs, Mar 17 – May 3 2026) tagged with gate conditions using daily OHLCV data. **EMA200 gate:** 55.2% hit rate, all blocked trades were longs (price below EMA200 for entire period — bearish regime). Blocked longs: avg −0.53%, 64.2% losing. Allowed shorts: avg −0.25%, 57.6% losing. Gate correctly identified worse direction — CONFIRMED effective as directional qualifier. **CRISIS gate:** 0.0% hit rate (zero false positives during 6 weeks of active trading). Gate does not fire spuriously during "normal" crypto volatility. True-positive calibration requires multi-year dataset with actual crisis events. OI gate deferred (requires sidecar log data). Script: `user_data/scripts/gate_calibration.py`. Output: `user_data/results/gate_calibration_tagged_trades.csv`. |
+| 2026-05-03 | **Sweep #6 B1 & B2 pre-deflation reads complete.** B1 (Stablecoin Netflow): found Unravel Finance and MEXC practitioner sources — signal is conceptually plausible but has ZERO quantitative validation (no backtests, no hit rates, no Sharpe). Revised estimate 30% → ~18%. B2 (IV Skew): Wang et al. 2024 paper behind paywall; Hoang & Baur 2020 not found in public search. Available public content is introductory only. Dependency on A1 (likely §6.1 fail) + BTC skew symmetry weakness (3:1 vs 10:1 for equities). Revised estimate 15% → ~8%. Aggregate expected survivors from Sweep #6 revised 0.90 → ~0.71 across all four pre-deflation reads. Process of pre-deflation reading continues to reduce estimates (every read has decreased survival), confirming sweep-time optimism bias. §8 Sweep #6 updated. |
+| 2026-05-03 | **§6.2 deflation worksheet template + worked example created.** `Templates/Edge_Deflation_Worksheet_TEMPLATE.md` — blank reusable template covering all §6.2 stages (setup, Sharpe decay, fee downgrade, slippage, regime weighting, selection bias, standalone test, verdict, paper replication checklist, reopen triggers). `Templates/Edge_Deflation_Worksheet_CandidateL_WORKED_EXAMPLE.md` — same template populated from `EnhancedCointPairs_Deep_Dive.md` Part 8 as the canonical worked example. Research Log §6.2 updated with pointers to both files. |
+| 2026-05-03 | **Hoyle & Shephard empirical test on LiqCascade + OracleSurfer realized PnL complete.** Per `Cursor_Next_Steps_2026-05-03.md` Item 1. LiqCascade (771 forward dry-run trades, V04+V05, extracted via SSH from droplet): ξ₀ = 0.992, γ₁ = 0.992 under EWMA (HS baseline) — HS test FAILS; trades cluster in high-vol periods (ξ₀ < 1), the convexity mechanism that makes vol scaling improve Sharpe in traditional futures is structurally absent. Shorts only (346 trades): ξ₀ = 0.878, γ₁ = 0.878 — most extreme ξ₀ < 1, HS test FAILS, but Sσ less negative than S (dampens losses). OracleSurfer: 11 trades — insufficient sample, not actionable. Implication: C1-Sharpe (naive vol targeting for Sharpe) very unlikely to pass §6.2; C1-Risk (drawdown reduction) remains viable. C1 survival estimate ~20% for Sharpe framing, ~40% for risk framing. Full report: `HS_Empirical_Test_LiqCascade_OracleSurfer_2026-05-03.md`. Analysis script: `user_data/scripts/hs_empirical_test.py`. Data extracted from LiqCascade droplet (138.197.188.16) and OracleSurfer droplet (104.248.17.129). |
+| 2026-05-03 | **Sourcing Sweep #6 complete + post-sweep article reads (3 references) + Sweep #6 retrospective.** First sweep under v5.1 three-axis protocol. Four candidates queued for §6.2 deflation: C1 Conditional Vol Targeting, B1 Stablecoin Netflow Gate, A1 Crypto GEX Flow, B2 IV Skew Gate. Initial sweep estimates totaled 1.20 expected survivors (within v5.1 baseline 0–2). Developer supplied full-text PDFs of Hoyle & Shephard 2018, Yuyama et al. 2023, and the Glassnode GEX Dec 2025 article; full-text reading materially revised estimates: C1 50%→30% (Yuyama shows BTC violates the precondition for naive vol targeting to add Sharpe — risk-overlay framing more likely path than Sharpe-enhancer), A1 25%→15% (Glassnode methodology is sales-gated, requires paid Professional feed or DIY-without-benchmark; may fail §6.1 buildability), B1 and B2 unchanged. Total revised expected survivors 0.90. Article-derived deflation-relevant facts captured in §8 Sweep #6 entry to prevent silent-debt loss. C1 deflation charter split into C1-Sharpe (likely fails per Yuyama) and C1-Risk (drawdown/Calmar — more likely passes). Sweep #6 retrospective added to §8 with 4 protocol improvements for Sweep #7: enforce §6.3 population at sweep time; full-text reads required for ≥25%-survival candidates pre-sweep-conclusion; source-quality whitelist/blacklist; explicit "search NOT done" list per sweep. Lesson #19 added (sweep-time abstracts contain less failure-mode information than full-text reads). §4.6 sequencing updated: step 6 marked DONE; new step 6.5 added — Cursor session work covering Hoyle/Shephard empirical test on LiqCascade and OracleSurfer realized PnL + §6.2 worksheet template materialization. New file: `Cursor_Next_Steps_2026-05-03.md` brief for the next Cursor session. Hard queueing constraint held throughout: no implementation work on Sweep #6 candidates until LiqCascade Phase 4 resolves at ~2026-05-16. |
 | 2026-05-03 | **GatedExecution Dev Plan v0.1 skeleton created.** `GatedExecution_Dev_Plan.md` drafted per §4.6 step 5. 9-part skeleton: signal interface contract (`{direction, confidence, freshness}` per pair per candle), gate catalog (4 CONFIRMED: spread/z-score, EMA200, CRISIS, OI; 4 CANDIDATE: XSMomentum rank, funding extreme, OFI, conformal; primary-signal placeholder), weighted-confidence combinator with mandatory gate veto and independence requirement, unified risk/exit (ATR trailing + ROI ladder + time stop + inverse-vol sizing), per-gate integration notes referencing existing candidate code, 5 open design questions for v1.0. Primary-signal slot invariant under both LiqCascade Phase 4 outcomes. Implementation phases deferred to v1.0 (post-Phase-4). §4.6 step 5 marked DONE; step 6 (Sweep #6) is now next-actionable. Candidate L reopen trigger (i) closed — gate confirmed. Related files list updated; memory files updated. |
 | 2026-05-03 | **Candidate L verdict reached — §6.2 Edge Deflation Pass complete.** Both source papers (Palazzi 2025, Tadi & Witzany 2025) **FAIL §6.2.6 standalone** (deflated return ~3–5%/yr, Sharpe ~0.20–0.40). **Verdict: option (a) — fold spread/z-score signal into §4.5 GatedExecution as sub-signal.** §4.3 L block updated with deflation outcome and reopen trigger; §4.5 GatedExecution table row for spread/z-score upgraded from "PARKED codebase" to "CONFIRMED gate"; §4.6 step 4 marked complete; step 5 (GatedExecution Dev Plan v0.1) is now next-actionable; §6.5 filter-precision table gains L row (first candidate with full §6.2 result); §6.5 v5.1 note expanded with corroboration that deflation correctly predicted standalone failure (paper's 35% OOS-positive ≈ our 33% forward replicas). `EnhancedCointPairs_Deep_Dive.md` Part 8 added (worksheet, checklist, post-mortem, verdict); `EnhancedCointPairs_Dev_Plan.md` FROZEN with status header. First full §6.2 worksheet in project history — process worked as designed. |
 | 2026-05-03 | **v5.1 — Sourcing protocol restructure; structural-alpha / gate-shaped bias.** §5 reframed around three structural axes (A: structural-alpha sources, B: gate-shaped signals for §4.5, C: capital-efficiency overlays). §5.5 search terms reorganized along these axes; legacy generic and architecture-specific terms demoted. §5.6 sweep protocol now requires per-axis allocation (~5 papers each, ≤15 total), per-axis hit-rate calibration, and a hard queueing constraint (sweep candidates queue for §6.2 only — no implementation work begins until ACTIVE strategies resolve their go/no-go gates). §4.6 sequencing expanded to 8 numbered steps (4 sessions of active work between now and LiqCascade Phase 4 resolution, then 2 trigger-based steps post-resolution); Sweep #6 trigger language tightened. Internal date inconsistency in original v5.0 (§4.6 said 2026-05-19; §8 Sweep #6 said 2026-05-29) resolved in favor of 2026-05-19 (6 weeks since Sweep #5 on 2026-04-07). §6.5 updated with note acknowledging v5.0 gates correctly rejected O (§6.1) and archived N investigation (§4.4 step 3) at low cost — gates work; problem was upstream candidate flow. §8 Sweep #6 entry rewritten with v5.1 three-axis structure. Lesson #18 added. No changes to §6 multi-stage gate, §7 techniques, or active strategy work (LiqCascade Phase 3.6, OracleSurfer v14 monitoring continue per §4.6 priority sequence). |
