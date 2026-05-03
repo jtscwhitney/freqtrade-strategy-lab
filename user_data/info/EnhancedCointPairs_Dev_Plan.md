@@ -1,7 +1,26 @@
 # Enhanced Cointegration Pairs Trading — Development Plan
 ## Candidate L from AlgoTrading Research Log
-## Created: 2026-03-31 | Status: Phase 1 lab complete · Phase 3 forward **discontinued** (Candidate L **PARKED** per Research Log §4.3, **2026-05-02**)
+## Created: 2026-03-31 | Status: **FROZEN** — Candidate L verdict reached 2026-05-03; spread/z-score signal absorbed into §4.5 GatedExecution
 
+> **2026-05-03 — VERDICT REACHED. This Dev Plan is now FROZEN.**
+>
+> Per `EnhancedCointPairs_Deep_Dive.md` Part 8.6, Candidate L's verdict is **option (a): fold the spread/z-score signal layer into §4.5 GatedExecution as a sub-signal**. Status remains **PARKED** (not ARCHIVED) per Research Log §4.3.
+>
+> **What this means for this Dev Plan:**
+> - **No further phases will be executed under this plan.** The Phase 1 → Phase 3 → Phase 4 → Phase 6 ladder is closed.
+> - All forward droplet operations are discontinued (closed 2026-05-02). The lab walk-forward and Phase 0 artifacts remain valid as historical record.
+> - Strategy files (`EnhancedCointPairsStrategy_V01.py`, `_V02.py`) are **retained as the reference implementation for spread/z-score signal computation** — to be consumed by `GatedExecution_Dev_Plan.md` (pending — Research Log §4.6 step 5).
+> - The dual-leg execution machinery (`confirm_trade_entry`, orphan-leg watchdog, β-weighted stakes) is **not** carried forward — GatedExecution does not need it. Only the signal output `{direction, confidence, freshness}` per pair per candle is preserved.
+> - Palazzi adaptive trailing stop + vol filter (`ENABLE_VOL_FILTER`, `ENABLE_SPREAD_TRAIL`) are **not** carried forward — lab tests showed they reduce P&L vs z-reversion + time stop, and GatedExecution's unified exit framework supersedes them.
+>
+> **For full rationale see `EnhancedCointPairs_Deep_Dive.md` Part 8** (§6.2 deflation worksheet, §6.3 replication checklists, forward post-mortem, verdict decision matrix).
+>
+> **Reopen trigger:** This Dev Plan reopens **only** if (i) GatedExecution Dev Plan v0.1 explicitly rejects the spread/z-score gate and we want to revisit option (b) portfolio-of-spreads, OR (ii) a §6.2 deflation pass on a *new* paper materially changes the deflated economics. Open-ended hyperopt or "one more droplet month" is not a valid reopen trigger.
+>
+> ---
+>
+> **Historical context (preserved for reference):**
+>
 > **v5.0 (2026-04-17) + closure (2026-05-02):** Candidate L remains **outside** ACTIVE — it has **not** cleared **`AlgoTrading_Research_Log.md` §6** (`freqtrade-strategy-lab`). The **`freqtrade-coint-pairs-trading`** six-container DigitalOcean experiment ran **≈ four calendar weeks** and was **stopped by policy**; see repo **`TESTING.md`** and **`EnhancedCointPairs_Deep_Dive.md` §6.3** for numbers. **Co-investigator recommendation: PARK (do not ARCHIVE)** — aggregate forward PnL was **noise (~+0.01% vs sum of stakes, closed + open MTM)** at final snapshot (**17** closed trade rows, **12** open legs — **below §2 ~50** closed-trade bar); **BTC/ETH** replicas **positive**, **BNB/SOL** and **BTC/SOL** replicas **hurt** totals. Preserve code for **§4.5 GatedExecution** optional spread gate or narrowed §6 revival; no further droplet spend until explicit reopen triggers in §4.3.
 >
 > **Forward checkpoints:** **2026-04-18** interim ≈ −1.72%; **2026-05-02** final combined ≈ **+0.01%** — **`TESTING.md`**, **`droplet_status_from_local.ps1`**.

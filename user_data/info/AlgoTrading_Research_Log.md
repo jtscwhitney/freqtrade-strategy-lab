@@ -1,8 +1,8 @@
 # AlgoTrading Research Log
 ## Maintained by: [Developer] + Claude (any model)
-## Version: v5.0 (2026-04-17 — Major restructure after Process Audit)
+## Version: v5.1 (2026-05-03 — Sourcing protocol restructure; structural-alpha / gate-shaped bias)
 ## Stack: Cursor / Freqtrade / FreqAI / Claude Opus 4.7
-## Prior version archived at: `AlgoTrading_Research_Log_v4.3_archive_2026-04-17.md`
+## Prior versions: `AlgoTrading_Research_Log_v4.3_archive_2026-04-17.md` (v1.0–v4.3)
 ## Companion: `Research_Audit_2026-04-17_Findings_and_Path_Forward.md` — read this first if you have not seen the audit
 
 ---
@@ -13,12 +13,14 @@
 
 **v5.0 changes (2026-04-17):** A process audit found that the prior 7-point evaluation filter had a 0/4 hit rate among PASS / STRONG PASS candidates that reached Phase 0. The filter was scoring buildability and literature fit, not edge. v5.0 rebuilds the workflow around a multi-stage gate (buildability → edge deflation → paper replication → Phase 0 economics → Phase 1 forward), introduces filter-precision tracking and a workflow kill criterion, refocuses effort on the only two strategies with real-time validation feedback (LiqCascade, OracleSurfer), and frames a synthesis initiative (GatedExecution) that combines lessons from archived candidates rather than repeatedly drawing fresh papers.
 
+**v5.1 changes (2026-05-03):** Sourcing protocol restructure. The v5.0 multi-stage gate is working as designed (Candidate O was correctly rejected at §6.1 for 4/7; Candidate N investigation correctly archived at step 3) — but the *upstream* candidate flow is still drawing from broad academic / practitioner sources with novelty bias, which has produced 0/7 wins. v5.1 narrows sourcing along three structural axes derived from the project's own evidence (Lesson #3, Lesson #17): structural-alpha sources, gate-shaped signals for §4.5 GatedExecution, and capital-efficiency / portfolio-construction overlays. §5, §5.5, §5.6 restructured around these axes. §4.6 sequencing expanded to 8 numbered steps reflecting the May–June 2026 plan (4 sessions of active work between now and LiqCascade Phase 4 resolution, then 2 trigger-based steps post-resolution). Sweep #6 trigger language tightened: the sweep produces queued candidates only — no implementation work begins until LiqCascade resolves. Lesson #18 added.
+
 **What it contains:**
 - **Roles & Objectives (§1–§2):** Who we are to each other and what we're trying to achieve. Claude is an equal partner, not an assistant.
 - **Stack & Constraints (§3):** The fixed technical realities every approach must fit within.
 - **Approach Registry (§4):** Active, archived, parked, candidate strategies. Project memory — check before suggesting anything to avoid re-treading.
 - **Synthesis Initiative — GatedExecution (§4.5):** The new primary architectural thesis. Combine validated signals from archived/parked candidates instead of always drawing fresh papers.
-- **Sourcing Configuration (§5):** Where we look for new strategy ideas, with reduced cadence and increased per-paper rigor.
+- **Sourcing Configuration (§5):** Where we look for new strategy ideas. v5.1 narrows along three structural axes: structural-alpha sources, gate-shaped signals for §4.5, and capital-efficiency overlays.
 - **Evaluation Process (§6):** The new multi-stage gate. Buildability filter → edge deflation pass → paper replication checklist → Phase 0 economics → Phase 1 forward. Plus filter-precision tracking and the workflow kill criterion.
 - **Techniques Library (§7):** Reusable techniques, tools, methods that strengthen candidates during evaluation, development, or operation.
 - **Sourcing Sweep Log (§8):** Record of each research sweep — sources, terms, papers reviewed, outcomes.
@@ -32,7 +34,7 @@
 **Workflow at a glance (Cursor + claude.ai):**
 
 *Track 1 — Research (claude.ai web sessions):*
-1. **Sourcing Sweeps:** Reduced cadence (no more than one sweep per ~6 weeks of calendar time, OR after a Phase 1 outcome on an active candidate, whichever is later). Quality > quantity. See §5 for sources.
+1. **Sourcing Sweeps:** Reduced cadence (no more than one sweep per ~6 weeks of calendar time, OR after a Phase 1 outcome on an active candidate, whichever is later). v5.1: each sweep covers all three structural axes (§5) and produces queued candidates only — no implementation work begins until ACTIVE strategies resolve their go/no-go gates. Quality > quantity. See §5 for sources, §5.5 for axis-organized search terms, §5.6 for sweep protocol.
 2. **Candidate Evaluation:** Two-stage gating. (a) The 7-point Buildability Filter (§6.1) — necessary but not sufficient. (b) The Edge Deflation Pass (§6.2) — mandatory. Only candidates clearing both proceed to a Paper Replication Checklist (§6.3) and Dev Plan.
 3. **Priority Ranking:** §4.6 reflects effort allocation, not just candidate ordering. The 70/30 rule (§4.6) is the operating principle until further notice.
 4. **Dev Plan Creation:** For the top-ranked candidate that has cleared §6.2, Claude creates a Dev Plan a Cursor session can execute from without conversation history.
@@ -237,14 +239,18 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 - **Files retained:** `EnsembleDonchianStrategy_V01/V02`, `config_donchian.json`, `user_data/scripts/donchian_phase0_sweep.py`, sweep artifacts.
 
 #### Candidate L: Enhanced Cointegration Pairs Trading (with adaptive trailing stop + vol filter)
-- **Status:** PARKED (2026-05-02) — **forward deploy discontinued** after ~4 calendar weeks live-shaped run; **does not merit ARCHIVED** until a formal post-mortem is desired, because lab walk-forward economics and reusable dual-leg infra remain intact.
+- **Status:** PARKED (2026-05-02) — **§6.2 Edge Deflation Pass completed 2026-05-03; verdict reached.** Spread/z-score signal is real but does not clear §6.2.6 standalone thresholds. **Verdict: option (a) — fold spread/z-score signal into §4.5 GatedExecution as a sub-signal.** Dev Plan FROZEN; Deep Dive Part 8 is the canonical worksheet.
 - **Source:** Palazzi (Journal of Futures Markets, Aug 2025) — adaptive trailing stop + vol filter on cointegrated crypto pairs (peer-reviewed). Also Tadi & Witzany (Financial Innovation, 2025) — copula-based pairs on Binance Futures.
-- **Headline (paper — not our realized forward):** Best-of-universe survivor metrics in Palazzi; see §6.2 deflation checklist before any revival.
-- **Lab vs forward split:** **`freqtrade-strategy-lab`** walk-forward on **BTC/ETH @ 4h** retained positive headline economics for **V01/V02 defaults** (see `user_data/results/cointpairs_comparison_tables.md`). **`freqtrade-coint-pairs-trading`** six-process forward test (**BTC/ETH, BNB/SOL, BTC/SOL** × **V01/V02**) did **not** validate standalone capital deployment: aggregate PnL was **noise-level** (~**+0.01%** vs sum of stakes, closed + open MTM snapshot **2026-05-02** via `droplet_status_from_local.ps1`) after recovering from an earlier −1.7% checkpoint; **BNB/SOL** and **BTC/SOL** replicas **hurt** totals while **BTC/ETH** replicas **positive** (~**+4.2%** each profile). Closed trade-row count (**17** across DBs at final snapshot) remained **far below §2’s ~50** minimum for a binary forward read — **does not advance §6** toward ACTIVE.
-- **Co-investigator recommendation:** **KEEP for next phases; do not archive.** Treat as **PARKED** signal/infrastructure layer: rerun only after **§6.2 Edge Deflation Pass** on Palazzi claims and explicit decision to (a) fold **spread / z-score** into **§4.5 GatedExecution** as an optional gate, **or** (b) revive as a standalone **portfolio-of-spreads §6** candidate with held-out pairs — **not** as open-ended droplet spend.
-- **Reopen triggers (preserved):** §6.2 deflation worksheet completed AND one of — (i) redesigned forward charter (subset of spreads / sizing / execution) cleared by checklist; **or** (ii) GatedExecution v0 architecture names L-derived signal explicitly; **or** (iii) new fee or venue assumption materially changes economics. Do **not** reopen for unfocused hyperopt or “one more droplet month” alone.
-- **Deploy / ops:** Droplet forward tests **stopped by policy 2026-05-02**; repo **`freqtrade-coint-pairs-trading`** retained for reproducibility and historical logs. Mirrors: `EnhancedCointPairs_Dev_Plan.md`, `EnhancedCointPairs_Deep_Dive.md` (both repos **`user_data/info/`**).
-- **Historical checkpoints:** 2026-04-18 combined snapshot ≈ −1.72%, 12 closed / 8 open legs — `freqtrade-coint-pairs-trading/TESTING.md`. Final 2026-05-02 combined snapshot **12** open legs, **17** closed trade rows — see Deep Dive changelog.
+- **§6.2 deflation outcome (2026-05-03):**
+  - **Palazzi 2025:** Input portfolio Sharpe 0.89 (per §6.2.5 explicit instruction; 13/37 OOS-positive). After 0.5 decay + fee tier downgrade + slippage + regime weighting → deflated return **~3–5%/yr**, deflated Sharpe **~0.20–0.30**. **FAIL §6.2.6** (need >25% return, Sharpe >1.0).
+  - **Tadi & Witzany 2025:** Inferred input Sharpe ~1.1. After deflations + softer (1/N)^0.3 selection penalty for weekly re-selection → deflated return **~3–5%/yr**, Sharpe **~0.30–0.40**. **FAIL §6.2.6.**
+  - Both papers **FAIL §6.2 standalone**. Both refer to GatedExecution per §6.2.6 last bullet ("discrete signal that could plug into GatedExecution").
+- **Empirical cross-check (forward droplet 2026-05-02):** 35% of paper's pairs OOS-positive (13/37); our forward replicas were 33% positive (1/3 spreads × 2 versions = BTC/ETH only) — within sampling noise. Direct confirmation that pair selection within the universe dominates strategy variant, and that deflation is correctly calibrated. Aggregate PnL **~+0.01%** vs sum of stakes; **17** closed trade rows (below §2 50-trade bar). BTC/ETH replicas ~+4.2% each; BNB/SOL and BTC/SOL replicas negative.
+- **Lab vs forward split (preserved):** Lab walk-forward on **BTC/ETH @ 4h** retained positive headline economics for **V01/V02 defaults** (see `user_data/results/cointpairs_comparison_tables.md`). Forward 6-process test did **not** validate standalone capital deployment.
+- **Reopen trigger (post-verdict):** This candidate reopens **only** if (i) GatedExecution Dev Plan v0.1 explicitly rejects the spread/z-score gate (then revisit option b portfolio-of-spreads with held-out pairs), OR (ii) a §6.2 deflation pass on a *new* paper materially changes the deflated economics. Open-ended hyperopt or "one more droplet month" remain **invalid** triggers.
+- **What carries forward into §4.5 GatedExecution:** Spread/z-score signal source `{direction, confidence, freshness}` per pair per candle, computable from `EnhancedCointPairsStrategy_V01.py` logic in a sidecar (no per-pair Freqtrade processes needed). Per-pair calibration is mandatory (naive multi-pair Phase 0 GO inheritance failed forward). Adaptive trailing stop + vol filter (Palazzi options) are **not** carried forward — lab demonstrated they reduce P&L; superseded by GatedExecution unified exit.
+- **Deploy / ops:** Droplet forward tests **stopped by policy 2026-05-02**; repo **`freqtrade-coint-pairs-trading`** retained for reproducibility and historical logs. Strategy files retained as reference implementation for spread/z-score signal computation only.
+- **Historical checkpoints:** 2026-04-18 combined snapshot ≈ −1.72%, 12 closed / 8 open legs — `freqtrade-coint-pairs-trading/TESTING.md`. Final 2026-05-02 combined snapshot **12** open legs, **17** closed trade rows. **2026-05-03:** §6.2 deflation completed; verdict (a) GatedExecution sub-signal; Dev Plan FROZEN. See `EnhancedCointPairs_Deep_Dive.md` Part 8.
 
 ### 4.4 CANDIDATES & INVESTIGATIONS
 
@@ -308,7 +314,7 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 | **OI confirmation** | OI change rate > threshold (per-pair calibrated) | VALIDATED on shorts (XRP/BNB/ETH/SOL) | LiqCascade Phase 3.5 |
 | **OFI confirmation (optional)** | LOB order flow imbalance agrees with entry direction | RESEARCH (real signal, fee-incompatible standalone) | Candidate A salvage |
 | **Conformal prediction wrapper** | Tighten entries when prediction interval is narrow and one-sided | RESEARCH | Technique 7.1 |
-| **Pairs spread / z-score (mean reversion)** | Dual-leg hedge-ratio spread signal (optional gate, not standalone capital) | PARKED codebase; forward discontinued 2026-05-02 (no ACTIVE GO) | Candidate L §4.3 |
+| **Pairs spread / z-score (mean reversion)** | Per-pair signal: `{direction, confidence ∝ \|z\| above entry, freshness}`. Per-pair calibration mandatory (forward 1/3 positive replicas). | **CONFIRMED gate (2026-05-03)** — §6.2 deflation FAIL standalone (~3–5%/yr post-deflation), 35% OOS-positive across paper universe matches our 33% forward survival; refer per §6.2.6 | Candidate L §4.3, Deep Dive Part 8 |
 
 **Architecture sketch:**
 - Each signal source produces a normalized output: {direction, confidence, freshness}.
@@ -328,7 +334,7 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 
 **First Dev Plan trigger:** When LiqCascade Phase 4 returns either a clean GO or a clean NO-GO with a clear successor signal candidate. Estimated calendar: late April to mid-May 2026.
 
-### 4.6 Effort Allocation & Priority Ranking (v5.0)
+### 4.6 Effort Allocation & Priority Ranking (v5.1)
 
 **The 70/30 rule:** Until at least one ACTIVE strategy clears its go/no-go gate (LiqCascade Phase 4 OR OracleSurfer 15-trade gate), allocate effort as:
 - **70%** to iterating on ACTIVE strategies (LiqCascade > OracleSurfer)
@@ -336,23 +342,46 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 
 **Sequenced priorities (do in order, do not parallelize):**
 
+> **Next actionable session work: step 5 (GatedExecution Dev Plan v0.1).** Steps 1–2 are passive monitoring; step 3 complete (v5.1, 2026-05-03); step 4 complete (2026-05-03 — verdict reached). Step 6 (Sweep #6) is queueing-gated behind step 5 per §5.6.
+
 1. **LiqCascade Phase 3.6** (passive, 2–3 week soak). V06 counter-trend deployed 2026-05-02 alongside V05 on droplet. Reassess at 50 closed trades or ~2026-05-16. Kill criterion: short PF < 1.0 → archive permanently.
 
 2. **OracleSurfer v14 monitoring** (passive, ongoing). At 8 closed v14 trades, mid-window check: if WR < 30%, pause and diagnose. Otherwise continue to 15-trade gate.
 
-3. **Deflation pass on Candidate L (PARKED)** (1 session). Forward droplet experiment concluded **2026-05-02**. Complete §6.2 on Palazzi 2025 and decide formally: integrate spread/z layer into **§4.5**, revive as narrowed portfolio-of-spreads charter, or **ARCHIVE**.
+3. **✓ DONE (v5.1, 2026-05-03) — §6.5 filter precision touch-up.** Acknowledged that v5.0 gates correctly rejected O (§6.1, 4/7) and correctly archived N investigation (§4.4 step 3) at low cost. See §6.5 v5.1 note.
 
-4. **GatedExecution Dev Plan v0.1** (1 session, only after step 1 outcome is known). Draft the synthesis architecture per §4.5 with the actual primary signal (LiqCascade if GO, alternative if NO-GO).
+4. **✓ DONE (2026-05-03) — Deflation pass on Candidate L (PARKED).** Forward droplet experiment concluded 2026-05-02. §6.2 worksheets on Palazzi 2025 and Tadi & Witzany 2025 completed in `EnhancedCointPairs_Deep_Dive.md` Part 8. Both papers **FAIL §6.2.6 standalone** (~3–5%/yr post-deflation). **Verdict: option (a) — fold spread/z-score into §4.5 GatedExecution as sub-signal.** Dev Plan FROZEN; §4.5 table updated; §6.5 filter-precision row to be added below.
 
-5. **Sourcing Sweep #6** (defer until step 4 is drafted OR until 6 weeks elapsed since 2026-04-07, whichever is later). When run, follow §5 v5.0 reduced-cadence / increased-rigor protocol.
+5. **← NEXT — GatedExecution Dev Plan v0.1 — skeleton draft** (1–2 sessions). Draft the structural design now: signal interface contract, gate combination logic (`min_agreeing_gates`, weights, mandatory flags), unified risk/exit framework, position sizing model. **Now includes spread/z-score gate explicitly** per step 4 verdict. Leave the *primary-signal* slot as a placeholder (resolves on LiqCascade Phase 4 outcome). Independent of which specific signal becomes primary — slots in cleanly when LiqCascade resolves.
 
-*This ranking reflects the state of knowledge as of **2026-05-02** (Candidate N archived — investigation failed; Candidate O rejected at §6.1 + Phase 0 NO-GO). Update after every checkpoint outcome.*
+6. **Sourcing Sweep #6** (1 session, eligible 2026-05-19 per original §4.6 trigger; may run earlier under v5.1 protocol if steps 3–5 complete). Run under the revised §5 / §5.6 v5.1 protocol — three narrow targeted gaps (structural alpha, gate-shaped signals, capital-efficiency overlays). **Hard constraint:** any candidate produced is queued for §6.2 deflation only; no implementation work begins until step 1 (LiqCascade Phase 4) resolves. This breaks the historical pattern where each sweep produced an immediate new #1 priority (J → M → L), all of which subsequently failed.
+
+7. **LiqCascade Phase 4 resolves** (passive trigger). Outcome determines step 8.
+
+8. **GatedExecution Dev Plan finalized + highest-priority §6.2-passing candidate from Sweep #6 enters deflation.** If LiqCascade GO: cascade detection becomes primary signal in GatedExecution. If LiqCascade NO-GO: the highest-conviction Sweep #6 candidate (likely a structural-alpha source per §5.6) is evaluated for the primary-signal slot.
+
+*This ranking reflects the state of knowledge as of **2026-05-03** (v5.1 sourcing protocol restructure). Update after every checkpoint outcome.*
 
 ---
 
 ## 5. Sourcing Configuration
 
-**v5.0 cadence change:** Prior pattern was ~1 sweep every 1–2 weeks producing many candidates (28+ total in 4 sweeps), with low conversion to live edge. New cadence: at most one sweep per 6 weeks of calendar time, OR triggered by an active-strategy phase outcome — not by mere passage of time. Each sweep should target a specific gap (e.g., "carry strategies with ≥ daily granularity"), not be a broad scan.
+**v5.0 cadence change (retained):** Prior pattern was ~1 sweep every 1–2 weeks producing many candidates (28+ total in 4 sweeps), with low conversion to live edge. Cadence now: at most one sweep per 6 weeks of calendar time, OR triggered by an active-strategy phase outcome. Each sweep targets a specific gap, not a broad scan.
+
+**v5.1 sourcing-bias change (new):** The v5.0 multi-stage gate is correctly *rejecting* weak candidates (Candidate O at §6.1, Candidate N at investigation step 3 — both low-cost rejections). The remaining problem is **upstream**: every candidate F through M came from broad academic / practitioner sweeps with novelty bias, and the resulting archetypes (paper-replicated single-strategy directional or quasi-directional models, hourly-to-daily TF, liquid crypto, retail fees) have a 0/7 win rate. Lesson #17 is now data: continuing to draw from the same distribution under the same novelty bias has poor base-rate conversion at our fee tier.
+
+**v5.1 narrows sourcing along three structural axes derived from the project's own evidence:**
+
+1. **Structural-alpha sources.** Lesson #3 (structural alpha > statistical alpha) is the highest-conviction empirical principle in this log. The only candidate in our registry built on a *why* before a *how* — LiqCascade, on forced liquidations — is also the only one currently producing real-time validation data, even if PF < 1.0. v5.1 explicitly biases sourcing toward terrain with a structural reason for the edge to exist that does not depend on competing on latency or being smarter than other quants. Examples: forced flows (ETF rebalances, perp funding payments, options expiry / dealer hedging), information-asymmetry events (token unlocks, exchange listings, scheduled airdrops, governance votes), carry / basis (perp-spot basis, calendar spreads), and microstructure dislocations that aren't latency-bound.
+
+2. **Gate-shaped signals for §4.5 GatedExecution.** Given that GatedExecution is the highest-leverage architectural bet on the board, signals that *reduce false positives* in an existing primary signal (LiqCascade or its successor) are higher-value to this project than the next standalone candidate. v5.1 explicitly admits "gate-shaped" signals as a sourcing target: directional-bias filters, regime confirmation, false-positive reduction methods, and extreme-value contrarian indicators.
+
+3. **Capital-efficiency / portfolio-construction overlays.** The registry has zero candidates built around portfolio construction, vol-targeting, dynamic hedging, or correlation-aware risk allocation. These have a structurally different failure surface than signal-discovery candidates because they don't depend on being right about direction — they multiply whatever edge a base strategy produces. Vol-targeting alone is well-documented as roughly doubling risk-adjusted returns of any base strategy. This is unexplored terrain in our project.
+
+**What v5.1 does NOT change:**
+- The source venues themselves (SSRN, arXiv, Quantpedia, practitioners) are correct. The problem was search terms and per-paper rigor, not where to look.
+- The novelty bias is preserved *in principle*, but redefined: novel **to our stack and fee tier** rather than novel to academic literature. A 10-year-old vol-targeting overlay never tried in our configuration is more novel-to-us than the next path-signatures paper.
+- §6 multi-stage gate is unchanged. v5.1 only changes what flows into §6.1.
 
 ### 5.1 Primary Sources
 
@@ -393,24 +422,68 @@ Status key: `ACTIVE` = currently deployed or under iteration · `ARCHIVED` = tri
 | Python for Finance | Yves Hilpisch | Python coding reference |
 | Trading and Exchanges | Larry Harris | Market microstructure |
 
-### 5.5 Search Terms
+### 5.5 Search Terms (v5.1 — reorganized around three structural axes)
 
-**Core:** `algorithmic trading strategy`, `crypto trading ML`, `systematic trading`
+**Legacy generic terms (retained for reference / non-targeted exploration):** `algorithmic trading strategy`, `crypto trading ML`, `systematic trading`. These are now low-priority — they produced our archived archetype.
 
-**Architecture-specific:** `state space model trading`, `temporal fusion transformer finance`, `reinforcement learning trading`, `hawkes process order flow`, `regime detection trading`, `liquidation cascade crypto`, `order flow imbalance`, `path signatures trading`, `rough path finance`
+**Axis A — Structural-Alpha Sources (priority for Sweep #6):**
+- Forced flows: `ETF rebalance crypto`, `liquidation cascade`, `forced selling crypto`, `perpetual funding payment flow`, `options expiry hedging crypto`, `dealer gamma hedging crypto`
+- Information-asymmetry events: `token unlock trading`, `exchange listing alpha`, `scheduled airdrop trading`, `governance vote trading`, `vesting cliff crypto`
+- Carry / basis: `perpetual basis arbitrage`, `funding rate carry crypto`, `calendar spread crypto futures`, `cash-and-carry crypto`, `term structure crypto`
+- Microstructure dislocations (non-latency): `cross-venue stablecoin spread`, `funding rate overshoot`, `perp-spot dislocation crypto`
 
-**Technique-specific:** `mean reversion crypto`, `momentum strategy ML`, `volatility forecasting`, `funding rate strategy`, `market microstructure alpha`, `conformal prediction trading`, `fractional differentiation trading`
+**Axis B — Gate-Shaped Signals for GatedExecution:**
+- `false positive reduction trading signal`
+- `directional bias filter crypto`
+- `regime confirmation gate`
+- `funding rate predictive signal`
+- `liquidation prediction model`
+- `whale flow directional filter`
+- `volatility regime classifier`
+- `crisis detection crypto`
+- `extreme value contrarian indicator`
 
-**Meta/methodology:** `backtesting pitfalls`, `walk-forward validation trading`, `overfitting trading strategies`, `synthetic data augmentation finance`, `transaction cost analysis crypto`, `deflated sharpe ratio`, `multiple testing corrections trading`
+**Axis C — Capital-Efficiency / Portfolio Overlays:**
+- `vol targeting crypto`
+- `dynamic hedging perpetual futures`
+- `correlation-aware position sizing`
+- `risk parity crypto portfolio`
+- `Kelly criterion crypto sizing`
+- `drawdown control overlay`
+- `meta-strategy portfolio construction`
+- `regime-conditional sizing`
 
-### 5.6 Sourcing Sweep Protocol (v5.0)
+**Architecture-specific (retained from v5.0, now lower priority):** `state space model trading`, `temporal fusion transformer finance`, `reinforcement learning trading`, `hawkes process order flow`, `path signatures trading`, `rough path finance`. These are technique terms that produced E (archived), J (parked), among others. Use only if a paper combines them with structural-alpha framing per Axis A.
+
+**Technique-specific (retained):** `mean reversion crypto`, `momentum strategy ML`, `volatility forecasting`, `funding rate strategy`, `market microstructure alpha`, `conformal prediction trading`, `fractional differentiation trading`. Treat as confirmation terms only — do not source new candidates from these as primary terms (this terrain is the archetype with 0/7 win rate).
+
+**Meta/methodology (retained, always relevant):** `backtesting pitfalls`, `walk-forward validation trading`, `overfitting trading strategies`, `synthetic data augmentation finance`, `transaction cost analysis crypto`, `deflated sharpe ratio`, `multiple testing corrections trading`
+
+### 5.6 Sourcing Sweep Protocol (v5.1)
 
 Each sweep MUST:
-1. State the **specific gap** being targeted (one paragraph; what kind of strategy and why now).
-2. Limit to **≤ 15 papers reviewed in detail** (vs prior ~30). Prefer fewer-deeper reads.
-3. For every promoted candidate, produce a **Paper Replication Checklist** (§6.3) populated at sweep time, not later.
-4. State expected hit rate: of the promoted candidates, how many will likely pass §6.2 Edge Deflation Pass? If the honest answer is "all of them," recalibrate — that's the sycophancy failure mode.
-5. End with a single co-investigator recommendation: which one (or none) to advance.
+
+1. **Cover all three v5.1 axes** (§5 introduction): Axis A (structural alpha), Axis B (gate-shaped signals), Axis C (capital-efficiency overlays). Allocate ~5 papers per axis. Total ≤ 15 papers reviewed in detail. A sweep that produces zero candidates from one or more axes is acceptable (rejection is a valid outcome) but the *search effort* must cover all three.
+
+2. **State the specific gap being targeted within each axis** (one paragraph per axis; what kind of strategy or signal, why now, what would clear §6.2).
+
+3. **Per-axis hit-rate calibration.** State expected hit rate per axis: of the candidates surfaced, how many will likely pass §6.2 Edge Deflation Pass? If the honest answer is "all of them," recalibrate — that's the sycophancy failure mode (§1).
+
+4. **For every promoted candidate, populate §6.3 Paper Replication Checklist at sweep time, not later.** Without this, the candidate does not count as "surfaced" — only "noted."
+
+5. **Hard queueing constraint (v5.1):** Any candidate produced by a sweep is queued for §6.2 deflation only — **no implementation work begins until current ACTIVE strategies have resolved their go/no-go gate**. This breaks the historical pattern where each sweep produced an immediate new #1 priority (J → M → L), all of which subsequently failed. The sweep's deliverable is *queued, deflation-ready candidates*, not "what to build next."
+
+6. **End with a single co-investigator recommendation per axis** (which one — or none — to advance from each axis), plus a cross-axis ranking if multiple advance. Recommendations must be honest about expected post-deflation survival.
+
+**v5.1 sweep template (use for Sweep #6 and beyond):**
+
+| Axis | Target gap | Search terms (from §5.5) | Papers cap | Expected §6.2 survivors |
+|---|---|---|---|---|
+| A — Structural alpha | [specific gap, e.g., "options expiry / dealer hedging flow on BTC"] | [3–5 terms from Axis A list] | 5 | [honest estimate] |
+| B — Gate-shaped signals | [specific gap, e.g., "directional bias filters complementary to LiqCascade"] | [3–5 terms from Axis B list] | 5 | [honest estimate] |
+| C — Capital efficiency | [specific gap, e.g., "vol-targeting overlay implementable in Freqtrade"] | [3–5 terms from Axis C list] | 5 | [honest estimate] |
+
+**§6.5 feedback loop (v5.1):** After each sweep concludes and its candidates have been through §6.2, update the filter precision table per-axis. If one axis is producing all the survivors and another is producing none across two sweeps, adjust axis weighting in the next sweep. If all three axes produce zero §6.2-passing candidates across two sweeps, escalate to §6.6 workflow kill criterion.
 
 ---
 
@@ -519,16 +592,24 @@ Each sweep MUST:
 - A candidate is a **filter PASS** if it cleared the prior 7-point evaluation filter (v4.x) OR the v5.0 multi-stage gate (§6.1 + §6.2 + §6.3).
 - A candidate is a **live WIN** if it reached ACTIVE status with a documented forward-test PF > 1.0 over ≥ 50 closed trades.
 
-| Candidate | Filter version | Filter score | Phase 0 outcome | Live status | Win? |
-|---|---|---|---|---|---|
-| F (CointPairs) | v4.0 | 6/7 + 1 cond | Phase 1 FAIL | ARCHIVED | NO |
-| E (Path Sigs) | v4.0 | 6/7 + 1 cond | Phase 1 FAIL | ARCHIVED | NO |
-| G (XSMomentum) | v4.0 | 7/7 STRONG | Phase 1 FAIL | PARKED | NO |
-| J (Donchian) | v4.0 | 7/7 STRONG | Phase 0 NO-GO | PARKED | NO |
-| M (AdaptiveTrend) | v4.0 | 6/7 + 1 cond | Phase 0 NO-GO | ARCHIVED | NO |
-| L (Enhanced CP) | v4.0 | 5/7 + 1 cond | lab WF positive; Phase 3 forward discontinued | PARKED | NO |
-| **Filter v4.x precision so far** | | | | | **0 / 5** |
-| | | | | | (L PARKED forward NO-GO — still no live WIN) |
+| Candidate | Filter version | Filter score | Phase 0 outcome | §6.2 deflation | Live status | Win? |
+|---|---|---|---|---|---|---|
+| F (CointPairs) | v4.0 | 6/7 + 1 cond | Phase 1 FAIL | (pre-§6.2) | ARCHIVED | NO |
+| E (Path Sigs) | v4.0 | 6/7 + 1 cond | Phase 1 FAIL | (pre-§6.2) | ARCHIVED | NO |
+| G (XSMomentum) | v4.0 | 7/7 STRONG | Phase 1 FAIL | (pre-§6.2) | PARKED | NO |
+| J (Donchian) | v4.0 | 7/7 STRONG | Phase 0 NO-GO | (pre-§6.2) | PARKED | NO |
+| M (AdaptiveTrend) | v4.0 | 6/7 + 1 cond | Phase 0 NO-GO | (pre-§6.2) | ARCHIVED | NO |
+| L (Enhanced CP) | v4.0 | 5/7 + 1 cond | lab WF positive; forward 1/3 replicas positive | **FAIL §6.2.6** (2026-05-03) — ~3–5%/yr deflated; refer to §4.5 | PARKED → §4.5 sub-signal | NO (standalone); confirmed gate signal |
+| **Filter v4.x precision so far** | | | | | | **0 / 6** |
+| | | | | | | (L: standalone NO; §6.2 correctly rejected; signal absorbed into §4.5) |
+
+**v5.1 note (2026-05-03):** Two candidates evaluated under v5.0 gates since v5.0 release have been correctly rejected at low cost without reaching the precision-tracking table:
+- **Candidate O (EMA50 × YTD Anchored VWAP):** Rejected at §6.1 (4/7 — below threshold). One Phase 0 quick-test confirmed (PF 0.75, −3.1%). No further effort spent. The §6.1 buildability filter functioned as a cheap reject at the right stage.
+- **Candidate N (ShortBias Momentum):** Archived at §4.4 step 3 (regime-split + benchmark-spread test). 2022 spread vs short-BnH = +3.03pp, below +5pp threshold. Confirmed as 96% short-beta capture. No Phase 0 build effort spent. The investigation procedure introduced in v5.0 (Lesson #16) functioned as designed.
+
+These do not enter the precision-tracking table per current definitions (which require §6.2 PASS to count as a "filter PASS"). They are noted here because they are evidence the v5.0 gates work *for what they screen* — the remaining problem is upstream candidate flow (addressed by v5.1 §5 sourcing restructure).
+
+**Candidate L deflation outcome (2026-05-03):** L is the **first candidate to receive a full §6.2 Edge Deflation Pass** under v5.0. Outcome: **FAIL §6.2.6 standalone** (deflated return ~3–5%/yr, deflated Sharpe ~0.20–0.40 — both papers Palazzi 2025 and Tadi & Witzany 2025). Critically, the §6.2 prediction was empirically corroborated by the forward droplet result: paper's 35% OOS-positive (13/37 pairs) ≈ our 33% positive forward replicas (1/3 spreads). This is the first data point we have on §6.2 *predictive accuracy*: the deflation correctly anticipated standalone failure, and the §6.2.6 last-bullet escape hatch ("refer to §4.5 GatedExecution") absorbed the real-but-sub-threshold signal as an explicit gate. Process worked as designed. See `EnhancedCointPairs_Deep_Dive.md` Part 8 for the worksheet and the verdict (option a).
 
 *Update this table after every Phase 0 outcome. If v5.0 gates produce ≥ 2/3 wins in their first 3 fully-evaluated candidates, the gates are effective. If 0/3 pass to live, escalate to §6.6.*
 
@@ -655,9 +736,13 @@ Each sweep MUST:
 - Recommendation: M promoted to #1 — subsequently ARCHIVED after V01/V02/V03 long-side failures
 - Notable not promoted: Bollinger Bands regime study (Arda) — flagged as Phase 0 fallback if M failed; Inan funding paper → Technique 7.4; Volume-Weighted TSMOM (Huang) → potential Phase 1 enhancement; LSTM TA on Bitcoin (single asset, black box); VWAP execution (not alpha generation); RSI on BTC (mean reversion fails — confirms architectural choices)
 
-### Sweep #6 — *not yet run; deferred per v5.0 §4.6 sequencing*
-- Trigger: after LiqCascade Phase 4 outcome OR 2026-05-29, whichever later
-- Target gap (preliminary): carry/basis sleeves at daily granularity that meet revised §2 frequency objective; OR a primary signal source for GatedExecution if LiqCascade Phase 4 returns NO-GO
+### Sweep #6 — *not yet run; eligible 2026-05-19 per §4.6 step 6 (may run earlier if §4.6 steps 3–5 complete)*
+- Trigger: §4.6 step 6 — eligible after deflation pass on L (step 4) and GatedExecution skeleton (step 5) are drafted, OR original 6-week trigger date 2026-05-19, whichever earlier. Hard constraint: candidates produced are queued for §6.2 deflation only; no implementation work begins until LiqCascade Phase 4 resolves.
+- **Target gaps (v5.1 three-axis structure per §5.6):**
+  - **Axis A — Structural alpha:** specific gap TBD at sweep time. Candidate areas: options expiry / dealer hedging flow on BTC and ETH (deepest derivatives terrain in crypto); perp-spot basis dislocations; scheduled token unlock event flow; funding-payment-driven flow at the 8h cadence.
+  - **Axis B — Gate-shaped signals for GatedExecution:** specific gap TBD at sweep time. Candidate areas: directional bias filters complementary to LiqCascade cascade signal; funding-rate predictive gates (Inan SSRN 5576424 already in §7.4 — find newer / complementary work); whale flow directional filter (Technique 7.4 currently RESEARCH).
+  - **Axis C — Capital efficiency:** specific gap TBD at sweep time. Candidate areas: vol-targeting overlay implementable as a Freqtrade `custom_stake_amount`; correlation-aware sizing for multi-pair strategies; drawdown-control overlay applicable to LiqCascade and OracleSurfer simultaneously.
+- **Expected post-§6.2 survivors:** honest estimate to be filled in at sweep time. v5.1 baseline expectation: 0–2 across all three axes combined. If estimate exceeds 2, recalibrate (sycophancy failure mode per §1).
 
 ---
 
@@ -699,12 +784,16 @@ Hard-won insights that apply across all approaches. Add as projects conclude.
 
 17. **(v5.0) Repeated failure across the same archetype is data about the archetype, not about specific implementations.** LOB, CointPairs, XSMomentum, Donchian, AdaptiveTrend — all five archived/parked candidates were "draw a paper, build it, hope it works." Three of five had >5/7 filter scores and still failed. The lesson is not "the next paper will be different" — it is "the paper-to-Phase-0 pipeline has poor base-rate conversion at our fee tier and forward conditions." Synthesis (GatedExecution) of validated sub-signals is a structurally different bet with potentially better base-rate. *(Process audit 2026-04-17)*
 
+18. **(v5.1) Sourcing bias matters as much as evaluation rigor.** The v5.0 multi-stage gate is correctly rejecting weak candidates (O at §6.1, N at investigation step 3). But if every candidate flowing into the gate is drawn from the same archetype that has 0/7 wins, even a perfect gate cannot manufacture a winner. The fix is upstream: bias sourcing toward terrain with structurally different base rates. v5.1 narrows along three axes — structural-alpha sources (where there's a *why* before a *how*, per Lesson #3), gate-shaped signals for §4.5 GatedExecution, and capital-efficiency overlays. The first axis is the highest-conviction; the second is the highest-leverage given current architecture; the third addresses unexplored terrain. *(Sourcing protocol restructure 2026-05-03)*
+
 ---
 
 ## 10. Version History
 
 | Date | Change |
 |---|---|
+| 2026-05-03 | **Candidate L verdict reached — §6.2 Edge Deflation Pass complete.** Both source papers (Palazzi 2025, Tadi & Witzany 2025) **FAIL §6.2.6 standalone** (deflated return ~3–5%/yr, Sharpe ~0.20–0.40). **Verdict: option (a) — fold spread/z-score signal into §4.5 GatedExecution as sub-signal.** §4.3 L block updated with deflation outcome and reopen trigger; §4.5 GatedExecution table row for spread/z-score upgraded from "PARKED codebase" to "CONFIRMED gate"; §4.6 step 4 marked complete; step 5 (GatedExecution Dev Plan v0.1) is now next-actionable; §6.5 filter-precision table gains L row (first candidate with full §6.2 result); §6.5 v5.1 note expanded with corroboration that deflation correctly predicted standalone failure (paper's 35% OOS-positive ≈ our 33% forward replicas). `EnhancedCointPairs_Deep_Dive.md` Part 8 added (worksheet, checklist, post-mortem, verdict); `EnhancedCointPairs_Dev_Plan.md` FROZEN with status header. First full §6.2 worksheet in project history — process worked as designed. |
+| 2026-05-03 | **v5.1 — Sourcing protocol restructure; structural-alpha / gate-shaped bias.** §5 reframed around three structural axes (A: structural-alpha sources, B: gate-shaped signals for §4.5, C: capital-efficiency overlays). §5.5 search terms reorganized along these axes; legacy generic and architecture-specific terms demoted. §5.6 sweep protocol now requires per-axis allocation (~5 papers each, ≤15 total), per-axis hit-rate calibration, and a hard queueing constraint (sweep candidates queue for §6.2 only — no implementation work begins until ACTIVE strategies resolve their go/no-go gates). §4.6 sequencing expanded to 8 numbered steps (4 sessions of active work between now and LiqCascade Phase 4 resolution, then 2 trigger-based steps post-resolution); Sweep #6 trigger language tightened. Internal date inconsistency in original v5.0 (§4.6 said 2026-05-19; §8 Sweep #6 said 2026-05-29) resolved in favor of 2026-05-19 (6 weeks since Sweep #5 on 2026-04-07). §6.5 updated with note acknowledging v5.0 gates correctly rejected O (§6.1) and archived N investigation (§4.4 step 3) at low cost — gates work; problem was upstream candidate flow. §8 Sweep #6 entry rewritten with v5.1 three-axis structure. Lesson #18 added. No changes to §6 multi-stage gate, §7 techniques, or active strategy work (LiqCascade Phase 3.6, OracleSurfer v14 monitoring continue per §4.6 priority sequence). |
 | 2026-05-02 | **LiqCascade Phase 3.5 complete; Phase 3.6 (V06 counter-trend) deployed.** Reassessment (752 trades): PF 0.488, short PF 0.672, time-stop rate unchanged at 56.4%. OI filter did not improve results. Binance WebSocket URL migrated Apr 23 — sidecar fixed (stall detection added, URL updated to `/market/ws/!forceOrder@arr`). V06 deployed: counter-trend fade, ETH+SOL only, 15-min time stop, flipped leverage. Kill criterion: 50 trades PF < 1.0. |
 | 2026-05-02 | **Candidate N — ARCHIVED (investigation failed step 3).** Short-only regime splits (2022/2023/2024): 6 pairs, ATR_MULT=3.5, 6h. 2022 spread strategy vs short-BnH = +3.03pp — below +5pp threshold; signal confirmed as 96% short-beta capture. Lesson #16 validated. **Candidate O (EMA50 × YTD Anchored VWAP) — REJECTED** at §6.1 (4/7) + Phase 0 NO-GO (PF 0.75, −3.1%, negative every calendar year). Short side −7.18% vs market +27.77%. Reference code retained. Priority ranking updated — LiqCascade reassessment now #1. |
 | 2026-05-02 | **Candidate L — forward deploy discontinued; PARKED.** Six-container **`freqtrade-coint-pairs-trading`** run ended by policy after ~**4 weeks**; final combined snapshot (**2026-05-02**): **12** open legs, **17** closed trade rows across DBs, aggregate **≈ +0.01%** vs sum of stakes (closed + open MTM). Per-spread: **BTC/ETH** replicas **~+4.25%** each (**V01/V02**), **BNB/SOL** and **BTC/SOL** replicas **negative**. **Recommendation: keep (not ARCHIVED)** — retain strategies + Phase 0 pipeline for **§4.5** optional spread gate or narrowed §6 revival; reopen only per §4.3 triggers. §4.6 step 4 updated. GatedExecution table gains pairs-spread row. Mirrors updated in **`user_data/info/EnhancedCointPairs_*.md`** (both repos). |
