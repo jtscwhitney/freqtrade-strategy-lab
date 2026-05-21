@@ -1,5 +1,7 @@
 # Liquidation Cascade Strategy — Deep Dive
-## Version 1 | Started: 2026-03-17 | Status: ACTIVE — Phase 3.5 (OI Filter Deployed — V05, 2026-04-06)
+## Version 1 | Started: 2026-03-17 | Status: ARCHIVED — NO GO (2026-05-21)
+### THIS COPY IS STALE — authoritative version is in `freqtrade-scalper/user_data/info/LiquidationCascade_Deep_Dive.md`
+### Final Result: V05 PF 0.493, V06 PF < 0.5 — both failed Phase 3. Cascade detection → GatedExecution gate signal.
 
 ---
 
