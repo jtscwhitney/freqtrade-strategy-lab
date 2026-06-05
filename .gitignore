@@ -49,6 +49,11 @@ catboost_info/
 sidecar/logs/
 sidecar/data/
 
+# Scratch debug / temp exports (e.g. S1 archived-project artifacts, ad-hoc trade dumps)
+*temp_*_trades.csv
+user_data/s1_*.txt
+user_data/s1_*.json
+
 # OS
 .DS_Store
 Thumbs.db
