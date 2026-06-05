@@ -1,0 +1,4 @@
+# The image build (Dockerfile) has no COPY steps — it only extends the base
+# image and pip-installs. So nothing from the repo needs to be sent as build
+# context. Ignore everything to keep the context tiny (user_data is multi-GB).
+*

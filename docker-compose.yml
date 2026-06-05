@@ -14,7 +14,7 @@
 services:
   freqtrade:
     build:
-      context: ../Freqtrade
+      context: .
       dockerfile: Dockerfile
     container_name: freqtrade_strategy_lab
     restart: unless-stopped
