@@ -1,6 +1,13 @@
 # AlgoTrading Research Log
 ## Maintained by: [Developer] + Claude (any model)
 ## Version: v5.3.2 (2026-05-22 — S1 NO-GO; T1 blocked on Tokenomist data decision; session ends here)
+> ⛔ **FROZEN / ARCHIVAL (2026-06-07).** This manual Research Log is being merged into the algo-bros
+> agent framework. The living successors are in `C:\Users\jtscw\algo-bros\docs\`:
+> `RESEARCH_LOG.md` (registry/research), `EVALUATION.md` (the §6 gates + §7 techniques),
+> `LESSONS.md` (§9 principles), `ARCHITECTURE.md` (system). Plan + migration status:
+> `algo-bros\docs\dev-plans\integration.md`. **Do not add new entries here** — this file is retained
+> as the source of record for the pre-integration history (still being mined section-by-section).
+
 ## Stack: Cursor / Freqtrade / FreqAI / Claude Opus 4.7
 ## Prior versions: `AlgoTrading_Research_Log_v4.3_archive_2026-04-17.md` (v1.0–v4.3)
 ## Companion: `Research_Audit_2026-04-17_Findings_and_Path_Forward.md` — read this first if you have not seen the audit
